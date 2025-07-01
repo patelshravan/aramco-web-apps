@@ -1,0 +1,739 @@
+#app-header .title {
+  font-size: 1rem !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.spinner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nested-table {
+  margin: 5px 0 5px 20px;
+  width: calc(100% - 20px);
+  font-size: 12px;
+}
+.nested-table th,
+.nested-table td {
+  padding: 4px 8px;
+  text-align: center;
+  border: 1px solid #dee2e6;
+}
+.nested-table thead th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+}
+.nomination-details {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.toggle-icon {
+  font-size: 12px;
+  display: inline-block;
+  width: 16px;
+}
+.nested-table-wrapper {
+  margin-left: 16px;
+}
+
+#customerAmendmentTable input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Unified Icon Buttons */
+.bottom-buttons .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  min-width: auto;
+  height: 36px;
+  white-space: nowrap;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Button icon */
+.bottom-buttons .btn i {
+  font-size: 1rem;
+  margin-right: 4px;
+}
+
+/* Optional: fix width for consistent sizing */
+.bottom-buttons .btn {
+  min-width: 90px;
+}
+
+.bottom-buttons .btn:hover {
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  filter: brightness(1.05);
+}
+
+/* Reset button spacing */
+.bottom-buttons .btn:not(:last-child) {
+  margin-right: 6px;
+}
+
+/* Vertical center alignment fix for long labels */
+.bottom-buttons {
+  align-items: center;
+  padding: 4px 10px;
+  flex-wrap: wrap;
+}
+
+/* Hide scrollbar for webkit browsers */
+.overflow-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.overflow-auto {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Remove unnecessary responsive min-width causing stretching */
+@media (max-width: 1200px) {
+  .btn-xs {
+    font-size: 0.6rem !important;
+    padding: 2px 5px !important;
+  }
+}
+
+@media (max-width: 992px) {
+  .btn-xs {
+    font-size: 0.55rem !important;
+    padding: 2px 4px !important;
+  }
+}
+
+/* Separator Line */
+.separator-line {
+  width: 100%;
+  height: 5px;
+  background: linear-gradient(to right, #1a73e8, #34d399, #f59e0b, #ef4444);
+  border-radius: 50px;
+  margin: 15px 0;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Model CSS */
+/* Only target the Working Capacity modal */
+#workingCapacityModal .modal-dialog {
+  max-width: 700px; /* Previously 95vw */
+  max-height: 85vh; /* Reduce height */
+  margin: 50px auto;
+}
+
+#workingCapacityModal .modal-content {
+  height: auto; /* Let it size based on content */
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+#workingCapacityModal .modal-body {
+  flex: 1;
+  overflow-y: auto; /* Add scroll if needed */
+  padding: 10px;
+  overflow: hidden;
+}
+
+#workingCapacityGrid {
+  width: 100% !important;
+}
+
+/* KPIs Cards */
+.kpi-card {
+  flex: 0 0 auto;
+  min-width: 250px;
+  max-width: 380px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  padding: 16px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  transition: 0.3s all ease-in-out;
+  overflow-x: auto;
+  margin-bottom: 3px;
+}
+
+.kpi-card-international {
+  flex: 0 0 auto;
+  min-width: 250px;
+  max-width: 750px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  padding: 16px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  transition: 0.3s all ease-in-out;
+  overflow-x: auto;
+  margin-bottom: 3px;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-card-international:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  scrollbar-width: thin; /* for Firefox */
+  scrollbar-color: #c1c1c1 transparent;
+}
+
+/* WebKit-based browsers */
+.kpi-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.kpi-table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kpi-table-wrapper::-webkit-scrollbar-thumb {
+  background-color: #b3b3b3;
+  border-radius: 3px;
+}
+
+.kpi-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: #888;
+}
+
+/* KPI Title */
+.kpi-card .card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #84bd00;
+  margin-bottom: 10px;
+}
+
+.kpi-card-international .card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #84bd00;
+  margin-bottom: 10px;
+}
+
+/* KPI Value */
+.kpi-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #00a3e0;
+  margin-bottom: 8px;
+}
+
+#kpiScrollContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  overflow-x: hidden;
+}
+
+#kpiScrollContainer::-webkit-scrollbar {
+  display: none;
+}
+
+/* Drag-to-scroll (touch + mouse) */
+#kpiScrollContainer.grabbing {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* KPI Table Inside Card */
+.kpi-card- table {
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.85rem;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.kpi-card-international table {
+  width: max-content;
+  min-width: 100%;
+  font-size: 0.85rem;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.kpi-card th,
+.kpi-card td {
+  padding: 4px 6px;
+  text-align: center;
+  font-weight: 500;
+  min-width: 60px;
+  white-space: nowrap;
+  word-break: break-word;
+}
+
+.kpi-card-international th,
+.kpi-card-international td {
+  padding: 4px 6px;
+  text-align: center;
+  font-weight: 500;
+  min-width: 60px;
+  white-space: nowrap;
+  word-break: break-word;
+}
+
+.with-right-border {
+  border-right: 2px solid #999;
+}
+
+@media (max-width: 768px) {
+  .button-group,
+  .bottom-buttons {
+    flex-direction: column;
+    gap: 5px !important;
+  }
+
+  .btn {
+    font-size: 0.8rem !important;
+    padding: 4px 8px !important;
+  }
+
+  .kpi-card {
+    min-width: 200px;
+    padding: 12px;
+  }
+
+  .kpi-card .card-title {
+    font-size: 0.9rem;
+  }
+
+  .kpi-card-international {
+    min-width: 200px;
+    padding: 12px;
+  }
+
+  .kpi-card-international .card-title {
+    font-size: 0.9rem;
+  }
+
+  .kpi-value {
+    font-size: 1.8rem;
+  }
+}
+
+/* Apply yellow background to all Adjustment columns */
+.yellow-bg {
+  background-color: #fef3c7 !important;
+  font-weight: bold;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.progress-container {
+  width: 100%;
+  height: 24px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 6px;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: width 0.3s ease;
+}
+
+.green-bar {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  color: #fff;
+}
+
+.red-bar {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  color: #fff;
+}
+
+.progress-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  top: 50%;
+  transform: translateY(-50%);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  color: #222121;
+}
+
+/* For very small progress (low value), set text color to black */
+.low-value .progress-text {
+  color: black !important;
+  font-weight: bold;
+}
+
+/* Clickable date with dropdown icon */
+.date-link {
+  color: #007bff;
+  cursor: pointer;
+  font-weight: bold;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 5px; /* Adds spacing between the number and icon */
+}
+
+/* Dropdown icon styling */
+.dropdown-icon {
+  font-size: 12px;
+  color: #007bff;
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Rotate dropdown when expanded */
+.date-link.expanded .dropdown-icon {
+  transform: rotate(180deg);
+}
+
+/* Detail Card Styling */
+.detail-card {
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.1);
+  margin: 10px;
+  transition: all 0.3s ease-in-out;
+}
+
+.detail-header {
+  font-size: 16px;
+  font-weight: bold;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+}
+
+.detail-content p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+/* Ensure date numbers align correctly and dropdown icon is positioned properly */
+.date-link {
+  display: flex;
+  align-items: center;
+  gap: 5px; /* Adds space between the number and dropdown */
+  color: #007bff;
+  cursor: pointer;
+  font-weight: bold;
+  text-decoration: none;
+  padding-right: 5px;
+}
+
+.dx-datagrid-headers .dx-datagrid-table td,
+.dx-datagrid-headers .dx-datagrid-table th {
+  border: 1.5px solid #d1d5db !important;
+  background-color: #e8ecef;
+  color: #333;
+  font-weight: 600;
+}
+
+.dx-datagrid-headers .dx-row > td {
+  text-align: center !important;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* -------- */
+
+/* Prevent entire page from scrolling */
+#tabpanel {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Ensure the grid container takes full height and only it scrolls */
+#liftingAmendmentGrid {
+  height: calc(100vh - 320px) !important;
+  width: 100%;
+  overflow: hidden;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* Hide the outer scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #1a73e8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: #f0f0f0;
+}
+
+#openingInventoryGrid,
+#workingCapacityGrid,
+#inventoryPlanningGrid {
+  margin-bottom: 15px; /* Reduce gap */
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* make the dialog almost full‑height */
+.modal-dialog-scrollable {
+  max-width: 90vw;
+  margin: 1rem auto;
+  height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* constrain the table wrapper inside the body */
+.amendment-table-wrapper {
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
+}
+
+th {
+  vertical-align: middle !important;
+}
+
+th input[type="checkbox"] {
+  margin-left: 6px;
+  vertical-align: middle;
+  transform: scale(1.2);
+  cursor: pointer;
+}
+
+/* hide outer page scrollbar when modal is open */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Fetch GOSP Simulated Avails */
+#gospSimulatedAvailsModal .modal-body {
+  padding: 20px;
+}
+
+#gospSimulatedAvailsModal .table {
+  margin-bottom: 0;
+}
+
+#gospSimulatedAvailsModal .form-check {
+  margin-bottom: 0;
+}
+
+#gospSimulatedAvailsModal .form-control {
+  width: 100%;
+}
+
+.disabled-blur {
+  background-color: #f0f0f0 !important;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#gospAvailsTable th {
+  background-color: #e9ecef;
+  text-align: center;
+}
+
+#gospAvailsTable td {
+  vertical-align: middle;
+}
+
+.small-input {
+  max-width: 120px;
+  text-align: center;
+}
+
+.small-input::-webkit-outer-spin-button,
+.small-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.small-input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.btn-toggle {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  background: none;
+  border: none;
+  padding: 5px 0;
+  cursor: pointer;
+}
+
+/* Action Dropdown */
+.action-floating-wrapper {
+  position: absolute;
+  top: 85px;
+  right: 30px;
+  z-index: 1030;
+  pointer-events: auto;
+}
+
+/* Main Action button */
+.action-dropdown .btn-primary {
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  background-color: #007bff;
+  border: none;
+  color: white;
+  box-shadow: none;
+  margin-top: 8px;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.action-dropdown .btn-primary:hover {
+  background-color: #0056b3;
+  color: white;
+}
+
+.action-dropdown .dropdown-menu {
+  right: 0;
+  left: auto;
+  min-width: 260px;
+  max-width: 95vw;
+  overflow: visible !important;
+  position: absolute !important;
+  z-index: 10000;
+  white-space: nowrap;
+  padding: 12px 0;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+}
+
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown.show > .dropdown-menu {
+  display: block;
+}
+
+.dropdown-submenu > a::after {
+  content: "▶";
+  float: right;
+  margin-left: 8px;
+  font-size: 0.75rem;
+  transition: transform 0.3s ease;
+}
+
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu.expanded > a::after {
+  transform: rotate(90deg);
+}
+
+.dropdown-submenu > .dropdown-menu {
+  top: 0;
+  right: 100%;
+  left: auto !important;
+  margin-top: -5px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 10001;
+  display: none;
+  white-space: nowrap;
+  padding: 8px 0;
+}
+
+/* Auto-flip submenu to left if near screen edge */
+.dropdown-submenu.menu-left > .dropdown-menu {
+  left: auto;
+  right: 100%;
+}
+
+/* Item hover style */
+.dropdown-item {
+  font-weight: 500;
+  padding: 8px 16px;
+  font-size: 0.92rem;
+  transition: background-color 0.2s ease;
+}
+
+/* Default hover effect */
+.dropdown-item:hover {
+  background-color: #e8f4ff;
+  color: #007bff;
+  font-weight: 600;
+  border-left: 4px solid #007bff;
+}
+
+/* Submenu section colors */
+.dropdown-submenu:nth-child(1) > a {
+  color: #007bff;
+} /* Terminal Avails */
+.dropdown-submenu:nth-child(2) > a {
+  color: #28a745;
+} /* Inventory Settings */
+.dropdown-submenu:nth-child(3) > a {
+  color: #ffc107;
+} /* Spot Sales */
+.dropdown-submenu:nth-child(4) > a {
+  color: #dc3545;
+} /* Lifting Amendment */
+
+/* Disabled item */
+.dropdown-item.disabled {
+  color: #ccc !important;
+  background-color: transparent !important;
+  pointer-events: none;
+  font-style: italic;
+}

@@ -1,0 +1,267 @@
+[
+  {
+    "intent": "bot_intro",
+    "patterns": [
+      "who are you",
+      "what are you",
+      "what's your job",
+      "what do you do",
+      "what can you do",
+      "introduce yourself",
+      "what's your purpose",
+      "how can you help",
+      "tell me about yourself"
+    ],
+    "confirmationPrompt": null,
+    "minConfirmationScore": 0.2,
+    "responseTemplate": "🤖 Hi! I’m your <b>Lifting Amendment Chatbot</b>.<br><br>✨ <b>Here’s what I can help you with:</b><br><br>• 🛠 Adjust <b>terminal avails</b> (TA)<br>• 📦 Manage <b>customer lifting adjustments</b> (CL)<br>• 🔍 Simulate <b>terminal avails scenarios & what-if impacts</b><br>• 📤 <b>Move or reset nominations</b><br>• 🧾 <b>Generate detailed PDF reports</b><br>• 🛑 <b>Reset all manual adjustments</b><br><br>💬 Just type your request and let’s get started!"
+  },
+  {
+    "intent": "bot_help",
+    "patterns": [
+      "help",
+      "show help",
+      "list commands",
+      "how can you help me",
+      "what are your capabilities",
+      "show available commands"
+    ],
+    "confirmationPrompt": null,
+    "minConfirmationScore": 0.2,
+    "responseTemplate": "📋 <b>Here’s what I can help you with:</b><br><br>✅ Adjust <b>terminal avails (TA)</b><br>✅ Update <b>customer lifting adjustments (CL)</b><br>✅ Simulate <b>avails, lifting, demand, or export changes</b><br>✅ Move or reset <b>nominations</b><br>✅ Generate <b>detailed PDF reports</b><br>✅ Reset <b>all manual adjustments</b><br><br>💬 <b>Example commands you can try:</b><br>• 'update terminal avails'<br>• 'update customer lifting adjustment'<br>• 'what happens if we increase avails'<br>• 'move nomination'<br>• 'reset nomination'<br>• 'generate pdf report'<br>• 'reset all adjustments'<br><br>Need guidance? Just ask me anytime 🚀"
+  },
+  {
+    "intent": "update_terminal_avails_adj",
+    "patterns": [
+      "update terminal avails for {product} from day {start} to {end} to {value}",
+      "change terminal avail adjustment for {product} from day {start} to {end} to {value}",
+      "modify TA for {product} between day {start} and {end}",
+      "set TA for {product} from day {start} to {end} to {value}",
+      "adjust terminal avails for {product} days {start}-{end} to {value}",
+      "change TA for {product} on days {start} to {end} to {value}",
+      "update TA for {product} from {start} to {end} to {value}",
+      "set terminal avail adjustment for {product} day {start} through {end} to {value}",
+      "update adjustment for {product} days {start} to {end} with value {value}"
+    ],
+    "confirmationPrompt": "⚙️ You want to update Terminal Avails Adjustment for multiple days. Shall I continue?",
+    "minConfirmationScore": 0.2,
+    "autofillSkipConfirmation": false,
+    "params": [
+      {
+        "name": "product",
+        "prompt": "dynamic_product_prompt",
+        "validation": "^[a-zA-Z0-9-]+$",
+        "extraction": "for ([a-zA-Z0-9-]+)",
+        "autofill": true
+      },
+      {
+        "name": "startDay",
+        "prompt": "From which day?",
+        "validation": "^\\d{1,2}$",
+        "extraction": "from (?:day )?(\\d+)",
+        "autofill": true
+      },
+      {
+        "name": "endDay",
+        "prompt": "Until which day?",
+        "validation": "^\\d{1,2}$",
+        "extraction": "to (\\d+)",
+        "autofill": true
+      },
+      {
+        "name": "value",
+        "prompt": "What adjustment value do you want to set?",
+        "validation": "^\\d+(\\.\\d+)?$",
+        "extraction": "to (\\d+(\\.\\d+)?)",
+        "autofill": true
+      }
+    ],
+    "function": "updateTerminalAvailsAdjustment",
+    "responseTemplate": "✅ Terminal Avails Adjustment for {{product}} from day {{startDay}} to day {{endDay}} set to {{value}}."
+  },
+  {
+    "intent": "update_customer_lifting_adj_cl",
+    "patterns": [
+      "update customer lifting adjustment for {product} from day {start} to {end} to {value}",
+      "set CL adjustment for {product} days {start}-{end} to {value}",
+      "adjust customer lifting CL for {product} between day {start} and {end} to {value}",
+      "modify customer lifting CL for {product} from {start} to {end} to {value}"
+    ],
+    "confirmationPrompt": "⚙️ You want to update Customer Lifting Adjustment (CL) for multiple days. Shall I continue?",
+    "minConfirmationScore": 0.2,
+    "autofillSkipConfirmation": false,
+    "params": [
+      {
+        "name": "product",
+        "prompt": "Which product?",
+        "validation": "^[a-zA-Z0-9-]+$",
+        "extraction": "for ([a-zA-Z0-9-]+)",
+        "autofill": true
+      },
+      {
+        "name": "startDay",
+        "prompt": "From which day?",
+        "validation": "^\\d{1,2}$",
+        "extraction": "from (?:day )?(\\d+)",
+        "autofill": true
+      },
+      {
+        "name": "endDay",
+        "prompt": "Until which day?",
+        "validation": "^\\d{1,2}$",
+        "extraction": "to (\\d+)",
+        "autofill": true
+      },
+      {
+        "name": "value",
+        "prompt": "What CL adjustment value do you want to set?",
+        "validation": "^\\d+(\\.\\d+)?$",
+        "extraction": "to (\\d+(\\.\\d+)?)",
+        "autofill": true
+      }
+    ],
+    "function": "updateCustomerLiftingAdjustmentCL",
+    "responseTemplate": "✅ Customer Lifting Adjustment (CL) for {{product}} from day {{startDay}} to day {{endDay}} set to {{value}}."
+  },
+  {
+    "intent": "move_nomination_by_bot",
+    "patterns": [
+      "move nomination {nominationNumber} to day {targetDay}",
+      "shift nomination {nominationNumber} to {targetDay}",
+      "reschedule nomination {nominationNumber} for day {targetDay}",
+      "move nomination",
+      "shift nomination",
+      "reschedule nomination"
+    ],
+    "params": [
+      {
+        "name": "nominationNumber",
+        "prompt": "Which nomination number?",
+        "validation": "^\\d+$"
+      },
+      {
+        "name": "targetDay",
+        "prompt": "To which day?",
+        "validation": "^\\d{1,2}$"
+      }
+    ],
+    "function": "moveNominationByBot",
+    "responseTemplate": "✅ Nomination {{nominationNumber}} has been moved to day {{targetDay}}."
+  },
+  {
+    "intent": "clarify_nomination_action",
+    "patterns": [
+      "nomination",
+      "I want to handle nomination",
+      "adjust nomination",
+      "manage nomination",
+      "shift nomination",
+      "reset nomination"
+    ],
+    "params": [
+      {
+        "name": "type",
+        "prompt": "Do you want to move or restore a nomination?",
+        "validation": "^(move|restore|reset)$"
+      }
+    ],
+    "function": "clarifyNominationAction"
+  },
+  {
+    "intent": "restore_nomination_by_bot",
+    "patterns": [
+      "restore nomination",
+      "reset nomination",
+      "undo nomination move",
+      "put nomination back",
+      "revert nomination"
+    ],
+    "params": [
+      {
+        "name": "nominationNumber",
+        "prompt": "Which nomination number?",
+        "validation": "^\\d+$",
+        "extraction": "(\\d+)"
+      }
+    ],
+    "function": "restoreNominationByBot",
+    "responseTemplate": "✅ Restoring nomination {{nominationNumber}}."
+  },
+  {
+    "intent": "simulate_avails_adjustment",
+    "patterns": [
+      "what happens if we increase avails by {increment}",
+      "what happens if we increase terminal avails by {increment}",
+      "what if we update terminal avails by {increment}",
+      "increase avails by {increment}",
+      "boost avails by {increment}",
+      "add {increment} to avails",
+      "simulate adding {increment} avails",
+      "increase avails by {increment} for {product}",
+      "add {increment} to {product} avails",
+      "simulate adding {increment} avails for {product}"
+    ],
+    "params": [
+      {
+        "name": "increment",
+        "prompt": "By how much do you want to increase avails?",
+        "validation": "^\\d+(\\.\\d+)?$",
+        "extraction": "by (\\d+)"
+      },
+      {
+        "name": "product",
+        "prompt": "For which product? (Or type 'all')",
+        "validation": "^[a-zA-Z0-9-]+$",
+        "extraction": "for ([a-zA-Z0-9-]+)"
+      }
+    ],
+    "function": "simulateProductAvailsAdjustment"
+  },
+  {
+    "intent": "reset_all_adjustments",
+    "patterns": [
+      "reset all adjustments",
+      "clear all adjustments",
+      "reset all lifting adjustments",
+      "clear terminal and customer adjustments",
+      "start over adjustments",
+      "wipe adjustments"
+    ],
+    "confirmationPrompt": "⚠️ Are you sure you want to reset all adjustments? (yes/no)",
+    "minConfirmationScore": 0.2,
+    "function": "resetAllAdjustmentsByBot",
+    "responseTemplate": "✅ All adjustments have been reset and the grid is refreshed."
+  },
+  {
+    "intent": "generate_pdf_report",
+    "patterns": [
+      "generate pdf",
+      "export report",
+      "download lifting amendment report",
+      "create pdf report"
+    ],
+    "function": "generatePdfFromBot",
+    "responseTemplate": "✅ Lifting amendment report PDF has been generated and downloaded."
+  },
+  {
+    "intent": "greet_user",
+    "patterns": ["hi", "hello", "hey"],
+    "confirmationPrompt": null,
+    "minConfirmationScore": 0.25,
+    "responseTemplate": "👋 Hey there! How can I assist you today?"
+  },
+  {
+    "intent": "fallback",
+    "patterns": [],
+    "confirmationPrompt": null,
+    "minConfirmationScore": 0.25,
+    "responseTemplate": "🤖 I’m not sure what you meant. Could you try rephrasing?"
+  },
+  {
+    "intent": "thank_user",
+    "patterns": ["thanks", "thank you", "thx", "appreciate it", "cheers"],
+    "confirmationPrompt": null,
+    "minConfirmationScore": 0.2,
+    "function": "respondToGratitude"
+  }
+]

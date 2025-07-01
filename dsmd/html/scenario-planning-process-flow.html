@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="csrf-token" content="{{ csrf_token() }}" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scenario Planning Process Flow</title>
+
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+    <link rel="stylesheet" href="../css/custom.css">
+    <link rel="stylesheet" href="../css/main.css">
+  
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <script>window.jQuery || document.write(decodeURIComponent('%3Cscript src="js/jquery.min.js"%3E%3C/script%3E'))</script>
+    <script src="../js/bootstrap.js"></script>
+    <script src="../js/moment.min.js"></script>
+
+    <link rel="stylesheet" href="../css/font-awesome.css">
+    <link rel="stylesheet" href="../css/styles.css" />
+  </head>
+  <body>
+    <header id="app-header">
+      <a href="#"><i class="fa fa-home fa-2x"></i></a>
+      <div class="ml-4 title">
+        Scenario Planning Cycle for <span id="datepicker1"></span>
+      </div>
+      <img src="../img/SA_logo.jpg" alt="logo" class="logo" />
+    </header>
+    <div class="header-border"></div>
+    <div class="overlay">
+      <svg
+        class="hourglass-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 120 206"
+        preserveAspectRatio="none"
+      >
+        <path
+          class="middle"
+          d="M120 0H0v206h120V0zM77.1 133.2C87.5 140.9 92 145 92 152.6V178H28v-25.4c0-7.6 4.5-11.7 14.9-19.4 6-4.5 13-9.6 17.1-17 4.1 7.4 11.1 12.6 17.1 17zM60 89.7c-4.1-7.3-11.1-12.5-17.1-17C32.5 65.1 28 61 28 53.4V28h64v25.4c0 7.6-4.5 11.7-14.9 19.4-6 4.4-13 9.6-17.1 16.9z"
+        />
+        <path
+          class="outer"
+          d="M93.7 95.3c10.5-7.7 26.3-19.4 26.3-41.9V0H0v53.4c0 22.5 15.8 34.2 26.3 41.9 3 2.2 7.9 5.8 9 7.7-1.1 1.9-6 5.5-9 7.7C15.8 118.4 0 130.1 0 152.6V206h120v-53.4c0-22.5-15.8-34.2-26.3-41.9-3-2.2-7.9-5.8-9-7.7 1.1-2 6-5.5 9-7.7zM70.6 103c0 18 35.4 21.8 35.4 49.6V192H14v-39.4c0-27.9 35.4-31.6 35.4-49.6S14 81.2 14 53.4V14h92v39.4C106 81.2 70.6 85 70.6 103z"
+        />
+      </svg>
+    </div>
+    <div class="p-4 flex-column flow-wrapper">
+      <div class="flex-row-align-center px-4 plan-container">
+        <div
+          class="flex-column-align-center text-center plan"
+          id="preRequisites"
+        >
+          <div class="rounded-circle border border-2 p-3">
+            <i class="fa fa-calendar fa-2x icon" aria-hidden="true"></i>
+          </div>
+          <h5 class="pt-2 label">Pre Requisites</h5>
+        </div>
+        <div class="step-line"></div>
+        <div
+          class="flex-column-align-center text-center plan"
+          id="createScenario"
+        >
+          <div class="rounded-circle border border-2 p-3">
+            <i class="fa fa-sitemap fa-2x icon" aria-hidden="true"></i>
+          </div>
+          <h5 class="pt-2 label">Create Scenario</h5>
+        </div>
+        <div class="step-line"></div>
+        <div
+          class="flex-column-align-center text-center plan"
+          id="approveScenario"
+        >
+          <div class="rounded-circle border border-2 p-3">
+            <i class="fa fa-address-card-o fa-2x icon" aria-hidden="true"></i>
+          </div>
+          <h5 class="pt-2 label">Approve Scenario</h5>
+        </div>
+        <div class="step-line"></div>
+        <div
+          class="flex-column-align-center text-center plan"
+          id="createNominationsinSAP"
+        >
+          <div class="rounded-circle border border-2 p-3">
+            <i class="fa fa-user-plus fa-2x icon" aria-hidden="true"></i>
+          </div>
+          <h5 class="pt-2 label">Create Nominations in SAP</h5>
+        </div>
+        <div class="step-line"></div>
+        <div class="flex-column-align-center text-center plan" id="completed">
+          <div class="rounded-circle border border-2 p-3">
+            <i class="fa fa-check fa-2x icon" aria-hidden="true"></i>
+          </div>
+          <h5 class="pt-2 label">Completed</h5>
+        </div>
+      </div>
+      <!-- Row 2 -->
+      <div
+        class="d-flex align-items-baseline gap-25 px-4 pt-2 task-card-wrapper"
+      >
+        <div class="task-card-container">
+          <div class="card task-card" id="west_availability">
+            <div class="card-body flex-column justify-content-between">
+              <div class="d-flex">
+                <div class="pb-3">
+                  <i class="fa fa-calendar fa-3x icon" aria-hidden="true"></i>
+                </div>
+              </div>
+              <h5 class="label">OSPAS</h5>
+              <p class="card-text card-font">
+                <a
+                  href="./mark-available-slots-in-west-terminal.html"
+                  id="l_west_availability"
+                  title="Marks West Terminal Availability"
+                  >Marks West Terminal Availability</a
+                >
+              </p>
+            </div>
+          </div>
+          <div class="card task-card mt-4" id="export_nomination">
+            <div class="card-body flex-column justify-content-between">
+              <div class="d-flex">
+                <div class="pb-3">
+                  <i class="fa fa-user-plus fa-3x icon" aria-hidden="true"></i>
+                </div>
+              </div>
+              <h5 class="label">COSMD</h5>
+              <p class="card-text card-font">
+                <a
+                  href="./export-customer-monthly-nomination.html"
+                  id="l_export_nomination"
+                  title="Enter Export Monthly Nomination"
+                  >Enter Export Monthly Nomination</a
+                >
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="task-card-container">
+          <div class="card task-card" id="cosmd_planning">
+            <div class="card-body flex-column justify-content-between">
+              <div class="d-flex">
+                <div class="pb-3">
+                  <i class="fa fa-sitemap fa-3x icon" aria-hidden="true"></i>
+                </div>
+              </div>
+              <h5 class="label">COSMD</h5>
+              <p class="card-text card-font">
+                <a
+                  href="./scenario-planning-cosmd-version-rw.html"
+                  id="l_cosmd_planning"
+                  title="Create Scenario"
+                  >Create Scenario</a
+                >
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="task-card-container">
+          <div class="card task-card" id="ospas_planning">
+            <div class="card-body flex-column justify-content-between">
+              <div class="d-flex">
+                <div class="pb-3">
+                  <i
+                    class="fa fa-address-card-o fa-3x icon"
+                    aria-hidden="true"
+                  ></i>
+                </div>
+              </div>
+              <h5 class="label">OSPAS</h5>
+              <p class="card-text card-font">
+                <a
+                  href="./approve-scenario-cosmd-version-ro.html"
+                  id="l_ospas_planning"
+                  title="Approve Scenario"
+                  >Approve Scenario</a
+                >
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="task-card-container">
+          <div class="card task-card" id="create_nom">
+            <div class="card-body">
+              <div class="d-flex">
+                <div class="pb-3">
+                  <i class="fa fa-user-plus fa-3x icon" aria-hidden="true"></i>
+                </div>
+              </div>
+              <h5 class="label">COSMD</h5>
+              <p class="card-text card-font">
+                <a
+                  href="./create_nomination_in_sap.html"
+                  id="l_create_nom"
+                  title="Create Nominations in SAP"
+                  >Create Nominations in SAP</a
+                >
+              </p>
+            </div>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+    <script src="../js/custom.js"></script>
+    <script src="../js/scenario-process-flow.js"></script>
+  </body>
+</html>

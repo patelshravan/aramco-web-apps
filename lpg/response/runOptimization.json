@@ -1,0 +1,44 @@
+{
+  "SPOT_SUGGESTIONS": [
+    {
+      "NOMINATION_NO": "234234",
+      "DATE_VALUE": "1",
+      "PRODUCT_CODE": "A-140",
+      "PRODUCT_CODE_NAME": "Propane",
+      "PRODUCT_GROUP": "LPG",
+      "LOCATION": "Ju'aymah NGL",
+      "MONTH_VALUE": "JUN2025",
+      "LIFTING_QTY": 500
+    },
+    {
+      "NOMINATION_NO": "3432",
+      "DATE_VALUE": "1",
+      "PRODUCT_CODE": "A-160",
+      "PRODUCT_CODE_NAME": "Butane",
+      "PRODUCT_GROUP": "LPG",
+      "LOCATION": "Ju'aymah NGL",
+      "MONTH_VALUE": "JUN2025",
+      "LIFTING_QTY": 200
+    },
+    {
+      "NOMINATION_NO": "XX34234XXX",
+      "DATE_VALUE": "2",
+      "PRODUCT_CODE": "A-150",
+      "PRODUCT_CODE_NAME": "Propane",
+      "PRODUCT_GROUP": "LPG",
+      "LOCATION": "Ju'aymah NGL",
+      "MONTH_VALUE": "JUN2025",
+      "LIFTING_QTY": 5000
+    },
+    {
+      "NOMINATION_NO": "34234234",
+      "DATE_VALUE": "2",
+      "PRODUCT_CODE": "A-160",
+      "PRODUCT_CODE_NAME": "Butane",
+      "PRODUCT_GROUP": "LPG",
+      "LOCATION": "Ju'aymah NGL",
+      "MONTH_VALUE": "JUN2025",
+      "LIFTING_QTY": 2000
+    }
+  ]
+}

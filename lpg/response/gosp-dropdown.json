@@ -1,0 +1,30 @@
+{
+  "MAPPING": [
+    {
+      "PRODUCT_GROUP": "CRUDE OIL",
+      "PRODUCT_GROUP_NAME": "Crude Oil",
+      "PRODUCT_CODE": "A-010",
+      "PRODUCT_CODE_NAME": "ASLT",
+      "GOSP_CODE": "G063",
+      "GOSP_NAME": "NUAYYIM",
+      "PLANT_AREA_CODE": "NUAYYIM",
+      "PLANT_AREA_NAME": "NUAYYIM",
+      "USER_GROUP": "UG1,STSPDPLPGTECH",
+      "GROUPID": "STSPDPLPGTECH",
+      "VERSION_NO": -1
+    },
+    {
+      "PRODUCT_GROUP": "CRUDE OIL",
+      "PRODUCT_GROUP_NAME": "Crude Oil",
+      "PRODUCT_CODE": "A-010",
+      "PRODUCT_CODE_NAME": "ASLT",
+      "GOSP_CODE": "G001",
+      "GOSP_NAME": "Hawtah GOSP 1",
+      "PLANT_AREA_CODE": "HAWTAH - ASL",
+      "PLANT_AREA_NAME": "HAWTAH - ASL",
+      "USER_GROUP": "UG1,STSPDPLPGTECH",
+      "GROUPID": "STSPDPLPGTECH",
+      "VERSION_NO": -1
+    }
+  ]
+}

@@ -1,0 +1,1036 @@
+import { BASE_URL, API_ENDPOINTS } from "../api/api-config.js";
+
+$(document).ready(function () {
+
+    let userAdjustedValues = {};
+
+    $(document).on("change", ".area-checkbox", function () {
+        // Save current adjustments before anything else
+        const gridInstance = $("#gospGrid1").dxDataGrid("instance");
+        if (gridInstance) {
+            const currentData = gridInstance.option("dataSource") || [];
+            currentData.forEach(row => {
+                const date = row.date;
+                if (!userAdjustedValues[date]) userAdjustedValues[date] = {};
+                Object.keys(row).forEach(key => {
+                    if (key.startsWith("adj_")) {
+                        userAdjustedValues[date][key] = row[key];
+                    }
+                });
+            });
+        }
+
+        const $checkboxes = $(".area-checkbox");
+        const selectedAreas = $checkboxes
+            .filter(":checked")
+            .map(function () { return this.value; })
+            .get();
+
+        if (selectedAreas.length === 0) {
+            $(this).prop("checked", true);
+            toastr.warning("At least one area must remain selected.");
+            return;
+        }
+
+        selection.areas = selectedAreas;
+
+        const AREA_TO_GOSPS = {};
+        originalGOSPData.forEach(row => {
+            if (!AREA_TO_GOSPS[row.PLANT_AREA_CODE]) {
+                AREA_TO_GOSPS[row.PLANT_AREA_CODE] = new Set();
+            }
+            AREA_TO_GOSPS[row.PLANT_AREA_CODE].add(row.GOSP_CODE);
+        });
+        Object.keys(AREA_TO_GOSPS).forEach(area => {
+            AREA_TO_GOSPS[area] = Array.from(AREA_TO_GOSPS[area]);
+        });
+
+        selection.gosps = selectedAreas.flatMap(area => AREA_TO_GOSPS[area] || []);
+
+        handleGospReadResponse({
+            GOSP_DATA: originalGOSPData,
+            GAUGE_FACTOR: Object.entries(gaugedFactors).map(([GOSP_CODE, GAUGE_FACTOR]) => ({
+                GOSP_CODE,
+                GAUGE_FACTOR
+            })),
+            TOT_PROD_DATA: originalTotalProductionData,
+            VERSION: versionListFromBackend
+        });
+    });
+
+    $.ajaxSetup({ cache: false });
+
+    const currentDate = moment();
+
+    function getQueryParams() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            productGroup: params.get("productGroup") || "",
+            products: params.get("product")?.split(",") || [],
+            productName: params.get("productName") || "",
+            areas: params.get("area")?.split(",") || [],
+            gosps: params.get("gosp")?.split(",") || [],
+            month: params.get("month") || "",
+            versionNo: Number(params.get("versionNo") || -1)
+        };
+    }
+
+    const selection = getQueryParams();
+
+    function updateHeader(selection) {
+        $("#app-header .title").html(`
+      <strong>GOSP Simulator</strong> -
+      <strong>Products:</strong> ${selection.productName || selection.products} |
+      <strong>Month:</strong> ${selection.month} |
+      <strong>Version:</strong> ${activeVersionFromReadAPI?.VERSION_NAME || "N/A"
+            } |
+      <strong>Description:</strong> ${activeVersionFromReadAPI?.VERSION_DESCRIPTION || "No description"
+            }
+    `);
+    }
+
+    let gaugedFactors = {};
+    let activeVersionFromReadAPI = null;
+    let savedVersions = [];
+    let versionListFromBackend = [];
+    let originalGOSPData = [];
+    let originalTotalProductionData = [];
+
+    function populateGaugeFactorModal() {
+        const tbody = $("#gaugeFactorTableBody");
+        tbody.empty();
+
+        selection.gosps.forEach(gosp => {
+            const key = gosp;
+            const factor = gaugedFactors[key] ?? 1;
+            const row = `
+     <tr>
+       <td>${gosp}</td>
+       <td><input type="number" step="0.01" value="${factor}" data-key="${key}"></td>
+     </tr>`;
+            tbody.append(row);
+        });
+    }
+
+    $("#gaugeFactorBtn").on("click", function () {
+        populateGaugeFactorModal();
+        $("#gaugeFactorModal").modal("show");
+    });
+
+    $("#saveGaugeFactorBtn").on("click", function () {
+        const updatedFactors = {};
+        $("#gaugeFactorTableBody input").each(function () {
+            const key = $(this).closest("tr").find("td:first").text().split("_").pop();
+            const value = parseFloat($(this).val()) || 1;
+            updatedFactors[key] = value;
+        });
+        console.log("Saved Gauge Factors:", updatedFactors);
+        Object.assign(gaugedFactors, updatedFactors);
+        $("#gaugeFactorModal").modal("hide");
+        $("#gospGrid1").dxDataGrid("instance").refresh();
+    });
+
+    $("#updateGaugeFactorBtn").on("click", async function () {
+        const updateBtn = $(this);
+        const saveBtn = $("#saveGaugeFactorBtn");
+        const closeBtn = $("#gaugeFactorModal .btn-close, #gaugeFactorModal .btn-cancel");
+        closeBtn.prop("disabled", true);
+
+        updateBtn
+            .prop("disabled", true)
+            .html(
+                '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...'
+            );
+        saveBtn.prop("disabled", true);
+
+        let factors = [];
+        $("#gaugeFactorTableBody tr").each(function () {
+            let gospCode = $(this).find("td:first").text().trim();
+            let factor = parseFloat($(this).find("input[type=number]").val()) || 1;
+
+            gaugedFactors[gospCode] = factor;
+
+            let apiFactor = (window.lastReadGaugeFactors || []).find(item =>
+                item.GOSP_CODE === gospCode && item.PRODUCT_CODE === selection.products[0]
+            );
+
+            factors.push({
+                GOSP_CODE: gospCode,
+                PRODUCT_CODE: selection.products[0],
+                BASE_UNIT: apiFactor?.BASE_UNIT || "MB",
+                CONVERSION_UNIT: apiFactor?.CONVERSION_UNIT || "MB",
+                GAUGE_FACTOR: factor
+            });
+        });
+
+        const csrfToken = await fetchCSRFToken();
+        const payload = { FACTORS: factors };
+        console.log("Gauge Factor Update Payload:", JSON.stringify(payload, null, 2));
+
+        try {
+            const response = await fetch(`${BASE_URL}${API_ENDPOINTS.UPDATE_GAUGE_FACTOR}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": csrfToken,
+                    "Cache-Control": "no-cache"
+                },
+                credentials: "include",
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Failed to update Gauge Factor");
+
+            const contentType = response.headers.get("Content-Type") || "";
+            if (contentType.includes("application/json")) {
+                const result = await response.json();
+                console.log("Gauge Factor Update Success:", result);
+            } else {
+                console.log("Gauge Factor Update Success: No response body");
+            }
+
+            toastr.success("Gauge factors updated successfully!");
+            $("#gospGrid1").dxDataGrid("instance").refresh();
+        } catch (error) {
+            console.error("Gauge Factor Update Failed:", error);
+            toastr.error("Failed to update gauge factors.");
+        } finally {
+            updateBtn.prop("disabled", false).html("Update (API)");
+            saveBtn.prop("disabled", false);
+            closeBtn.prop("disabled", false);
+            $("#gaugeFactorModal").modal("hide");
+        }
+    });
+
+    async function fetchCSRFToken() {
+        const csrfURL = `${BASE_URL}${API_ENDPOINTS.CSRF}?_t=${Date.now()}`;
+        const res = await fetch(csrfURL, {
+            method: "GET",
+            credentials: "include",
+            headers: { "Cache-Control": "no-cache" },
+        });
+        return res.headers.get("X-CSRF-TOKEN");
+    }
+
+    // Open Button
+    $("#openButton").on("click", function () {
+        const $select = $("#versionSelect").empty();
+        const $message = $("#noVersionsMessage");
+
+        if (savedVersions.length > 0) {
+            savedVersions.forEach((v) => {
+                $select.append(
+                    `<option value="${String(v.id)}">${v.name || "Unnamed Version"}</option>`
+                );
+            });
+            $select.show();
+            $message.hide();
+        } else {
+            $select.hide();
+            $message.show();
+        }
+
+        $("#openVersionModal").modal("show");
+    });
+
+    $("#confirmOpenVersion").on("click", function () {
+        const selectedId = $("#versionSelect").val();
+        const selectedVersion = savedVersions.find(v => String(v.id) === selectedId);
+
+        if (!selectedVersion) {
+            toastr.error("Please select a version.");
+            return;
+        }
+
+        selection.versionNo = Number(selectedVersion.id);
+        callGOSPReadAPI();
+
+        $("#openVersionModal").modal("hide");
+    });
+
+    // Save Button
+    $("#saveButton").on("click", function () {
+        saveData();
+    });
+
+    async function saveData() {
+        $("#loadingSpinner, .overlay").show();
+
+        const grid = $("#gospGrid1").dxDataGrid("instance");
+        const data = grid.option("dataSource");
+
+        const GOSP_DATA = [];
+        const TOT_PROD_DATA = [];
+
+        const monthValue = selection.month.replace(" ", "").toUpperCase();
+
+        data.forEach(row => {
+            const allAreaGospPairs = [...new Set(originalGOSPData.map(r => `${r.PLANT_AREA_CODE}_${r.GOSP_CODE}`))];
+
+            allAreaGospPairs.forEach(pair => {
+                const [area, gosp] = pair.split("_");
+
+                const matched = originalGOSPData.find(r =>
+                    r.DATE_VALUE == row.date &&
+                    r.PLANT_AREA_CODE === area &&
+                    r.GOSP_CODE === gosp &&
+                    r.PRODUCT_CODE === selection.products[0]
+                ) || {};
+
+                GOSP_DATA.push({
+                    VERSION_NO: matched.VERSION_NO ?? -1,
+                    HISTORY_NO: matched.HISTORY_NO ?? null,
+                    KS_ROW_NUM: matched.KS_ROW_NUM ?? null,
+                    PRODUCT_GROUP: selection.productGroup,
+                    PRODUCT_CODE: selection.products[0],
+                    PLANT_AREA_CODE: area,
+                    GOSP_CODE: gosp,
+                    GOSP_NAME: matched.GOSP_NAME ?? "",
+                    DATE_VALUE: row.date,
+                    MONTH_VALUE: monthValue,
+                    ACTUAL_QTY: row[`act_${area}_${gosp}`] ?? matched.ACTUAL_QTY ?? 0,
+                    ADJUSTED_QTY: row[`adj_${area}_${gosp}`] ?? matched.ADJUSTED_QTY ?? 0
+                });
+            });
+
+            TOT_PROD_DATA.push({
+                DATE_VALUE: row.date,
+                TOTAL_PRODUCTION_QTY: row.totalProduction || 0
+            });
+        });
+
+        const GAUGE_FACTOR = Object.entries(gaugedFactors).map(([gosp, factor]) => ({
+            GOSP_CODE: gosp,
+            PRODUCT_CODE: selection.products[0],
+            BASE_UNIT: "MB",
+            CONVERSION_UNIT: "MB",
+            GAUGE_FACTOR: factor
+        }));
+
+        const payload = {
+            VERSION: versionListFromBackend,
+            GAUGE_FACTOR: GAUGE_FACTOR,
+            GOSP_DATA: GOSP_DATA,
+            TOT_PROD_DATA: TOT_PROD_DATA
+        };
+
+        console.log("Final Save Payload:", payload);
+
+        try {
+            const csrfToken = await fetchCSRFToken();
+            const response = await fetch(`${BASE_URL}${API_ENDPOINTS.GOSP_SAVE}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": csrfToken,
+                    "Cache-Control": "no-cache",
+                },
+                credentials: "include",
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Save API failed with status: " + response.status);
+
+            const result = await response.json();
+            console.log("Save Success:", result);
+            toastr.success("GOSP data saved successfully!");
+
+            userAdjustedValues = {};
+            handleGospReadResponse(result);
+        } catch (error) {
+            console.error("Save Failed:", error);
+            toastr.error("Failed to save GOSP data.");
+        } finally {
+            $("#loadingSpinner, .overlay").fadeOut();
+        }
+    };
+
+    // Save As Button
+    $("#saveAsButton").on("click", function () {
+        $("#saveName").val("");
+        $("#saveDescription").val("");
+        $("#saveAsModal").modal("show");
+    });
+
+    $("#saveAsForm").on("submit", async function (e) {
+        e.preventDefault();
+        $("#loadingSpinner, .overlay").show();
+
+        $("#saveAsModal .btn-close").prop("disabled", true);
+        $("#saveAsModal .btn-cancel").prop("disabled", true);
+
+        const name = $("#saveName").val().trim();
+        const description = $("#saveDescription").val().trim();
+
+        if (!name) {
+            toastr.error("Please enter a name");
+            $("#loadingSpinner, .overlay").fadeOut();
+            $("#saveAsSubmitBtn").prop("disabled", false);
+            $("#saveAsLoadingSpinner").addClass("d-none");
+            $("#saveAsBtnText").text("Save");
+            $("#saveAsModal .btn-close").prop("disabled", false);
+            $("#saveAsModal .btn-cancel").prop("disabled", false);
+            return;
+        }
+
+        if (savedVersions.some(version => version.name === name)) {
+            toastr.error("Version name already exists. Please choose a different name.");
+            $("#loadingSpinner, .overlay").fadeOut();
+            $("#saveAsSubmitBtn").prop("disabled", false);
+            $("#saveAsLoadingSpinner").addClass("d-none");
+            $("#saveAsBtnText").text("Save");
+            $("#saveAsModal .btn-close").prop("disabled", false);
+            $("#saveAsModal .btn-cancel").prop("disabled", false);
+            return;
+        }
+
+        $("#saveAsSubmitBtn").prop("disabled", true);
+        $("#saveAsLoadingSpinner").removeClass("d-none");
+        $("#saveAsBtnText").text("Saving...");
+
+        try {
+            const grid = $("#gospGrid1").dxDataGrid("instance");
+            const data = grid.option("dataSource");
+
+            const monthValue = selection.month.replace(" ", "").toUpperCase();
+
+            const GOSP_DATA = [];
+            const TOT_PROD_DATA = [];
+
+            data.forEach(row => {
+                const allAreaGospPairs = [...new Set(originalGOSPData.map(r => `${r.PLANT_AREA_CODE}_${r.GOSP_CODE}`))];
+
+                allAreaGospPairs.forEach(pair => {
+                    const [area, gosp] = pair.split("_");
+
+                    const matched = originalGOSPData.find(r =>
+                        r.DATE_VALUE == row.date &&
+                        r.PLANT_AREA_CODE === area &&
+                        r.GOSP_CODE === gosp &&
+                        r.PRODUCT_CODE === selection.products[0]
+                    ) || {};
+
+                    GOSP_DATA.push({
+                        VERSION_NO: matched.VERSION_NO ?? -1,
+                        HISTORY_NO: matched.HISTORY_NO ?? null,
+                        KS_ROW_NUM: matched.KS_ROW_NUM ?? null,
+                        PRODUCT_GROUP: selection.productGroup,
+                        PRODUCT_CODE: selection.products[0],
+                        PLANT_AREA_CODE: area,
+                        GOSP_CODE: gosp,
+                        GOSP_NAME: matched.GOSP_NAME ?? "",
+                        DATE_VALUE: row.date,
+                        MONTH_VALUE: monthValue,
+                        ACTUAL_QTY: row[`act_${area}_${gosp}`] ?? matched.ACTUAL_QTY ?? 0,
+                        ADJUSTED_QTY: row[`adj_${area}_${gosp}`] ?? matched.ADJUSTED_QTY ?? 0
+                    });
+                });
+
+                TOT_PROD_DATA.push({
+                    DATE_VALUE: row.date,
+                    TOTAL_PRODUCTION_QTY: row.totalProduction || 0
+                });
+            });
+
+            const GAUGE_FACTOR = Object.entries(gaugedFactors).map(([gosp, factor]) => ({
+                GOSP_CODE: gosp,
+                PRODUCT_CODE: selection.products[0],
+                BASE_UNIT: "MB",
+                CONVERSION_UNIT: "MB",
+                GAUGE_FACTOR: factor
+            }));
+
+            const payload = {
+                VERSION: {
+                    VERSION_NO: -1,
+                    VERSION_NAME: name,
+                    VERSION_DESCRIPTION: description
+                },
+                GAUGE_FACTOR: GAUGE_FACTOR,
+                GOSP_DATA: GOSP_DATA,
+                TOT_PROD_DATA: TOT_PROD_DATA,
+            };
+
+            console.log("Save As Payload:", payload);
+
+            const csrfToken = await fetchCSRFToken();
+
+            const response = await fetch(`${BASE_URL}${API_ENDPOINTS.GOSP_SAVE}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": csrfToken,
+                    "Cache-Control": "no-cache"
+                },
+                credentials: "include",
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Save As failed: " + response.status);
+            const result = await response.json();
+
+            toastr.success(`Saved as "${name}"`);
+            $("#saveAsModal").modal("hide");
+
+            userAdjustedValues = {};
+            handleGospReadResponse(result);
+
+            activeVersionFromReadAPI = {
+                VERSION_NO: result.VERSION?.VERSION_NO ?? -1,
+                VERSION_NAME: result.VERSION?.VERSION_NAME ?? name,
+                VERSION_DESCRIPTION: result.VERSION?.VERSION_DESCRIPTION ?? description
+            };
+            updateHeader(selection);
+        } catch (err) {
+            console.error("Save As Failed:", err);
+            toastr.error("Failed to save version.");
+        } finally {
+            $("#saveAsSubmitBtn").prop("disabled", false);
+            $("#saveAsLoadingSpinner").addClass("d-none");
+            $("#saveAsBtnText").text("Save");
+            $("#loadingSpinner, .overlay").fadeOut();
+            $("#saveAsModal .btn-close").prop("disabled", false);
+            $("#saveAsModal .btn-cancel").prop("disabled", false);
+        }
+    });
+
+    // Notify OSPAS Button
+    $("#notifyOSPASBtn").on("click", function () {
+        $("#ospasComment").val("");
+        $("#notifyOSPASModal").modal({
+            backdrop: "static",
+            keyboard: false
+        }).modal("show");
+    });
+
+    $("#sendOSPASBtn").on("click", async function () {
+        const comment = $("#ospasComment").val().trim();
+        if (!comment) {
+            toastr.error("Please enter a comment before sending.");
+            return;
+        }
+
+        $("#sendOSPASBtn").prop("disabled", true);
+        $("#notifyOSPASModal .btn-close").prop("disabled", true);
+        $("#notifyOSPASModal .btn-cancel").prop("disabled", true);
+        $("#ospasSpinner").removeClass("d-none");
+        $("#ospasBtnText").text("Sending...");
+
+        try {
+            const csrfToken = await fetchCSRFToken();
+            const payload = {
+                COMMENT: comment,
+                MONTH_VALUE: selection.month.replace(/\s+/g, "").toUpperCase(),
+                PRODUCT_CODE: selection.products[0],
+                PRODUCT_GROUP: selection.productGroup,
+                VERSION_NO: activeVersionFromReadAPI?.VERSION_NO ?? -1
+            };
+
+            const response = await fetch(`${BASE_URL}${API_ENDPOINTS.NOTIFY_OSPAS}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": csrfToken,
+                    "Cache-Control": "no-cache"
+                },
+                credentials: "include",
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Notification failed");
+
+            toastr.success("Notification sent to OSPAS successfully.");
+            $("#notifyOSPASModal").modal("hide");
+        } catch (err) {
+            console.error("Notify OSPAS Failed:", err);
+            toastr.error("Failed to notify OSPAS.");
+        } finally {
+            $("#sendOSPASBtn").prop("disabled", false);
+            $("#notifyOSPASModal .btn-close").prop("disabled", false);
+            $("#notifyOSPASModal .btn-cancel").prop("disabled", false);
+            $("#ospasSpinner").addClass("d-none");
+            $("#ospasBtnText").text("Send");
+        }
+    });
+
+    function renderAreaFilterOptions() {
+        const container = $("#areaFilterContainer").empty();
+        const uniqueAreas = [...new Set(originalGOSPData.map(r => r.PLANT_AREA_CODE))];
+
+        uniqueAreas.forEach(area => {
+            const checked = selection.areas.includes(area) ? "checked" : "";
+            const checkbox = `
+            <label class="mr-3 mb-2 d-inline-block">
+                <input type="checkbox" class="area-checkbox" value="${area}" ${checked}>
+                ${area}
+            </label>
+        `;
+            container.append(checkbox);
+        });
+    }
+
+    async function callGOSPReadAPI() {
+        try {
+            $("#loadingSpinner, .overlay").show();
+
+            const payload = {
+                PRODUCT_GROUP: selection.productGroup,
+                PRODUCT_CODE: selection.products,
+                PLANT_AREA_CODE: selection.areas,
+                MONTH_VALUE: moment(selection.month, "MMM YYYY").format("MMMYYYY").toUpperCase(),
+                GOSP_CODE: selection.gosps,
+                VERSION_NO: selection.versionNo
+            };
+
+            // const csrfToken = await fetchCSRFToken();
+            // const response = await fetch(`${BASE_URL}${API_ENDPOINTS.GOSP_READ}`, {
+            //     method: "POST",
+            //     headers: {
+            //         "Content-Type": "application/json",
+            //         "X-CSRF-TOKEN": csrfToken,
+            //         "Cache-Control": "no-cache"
+            //     },
+            //     credentials: "include",
+            //     body: JSON.stringify(payload)
+            // });
+            // const json = await response.json();
+
+            const response = await fetch("../response/gosp_dynamic_production.json")
+            const json = await response.json();
+
+            $("#loadingSpinner, .overlay").fadeOut();
+            toastr.success("GOSP data loaded successfully", "Success");
+
+            originalTotalProductionData = json.TOT_PROD_DATA || [];
+
+            // Saved Versions
+            if (Array.isArray(json.LIST_VERSIONS)) {
+                savedVersions = json.LIST_VERSIONS.map(v => ({
+                    id: v.VERSION_NO,
+                    name: v.VERSION_NAME,
+                    description: v.VERSION_DESCRIPTION
+                }));
+            }
+
+            if (Array.isArray(json.VERSION) && json.VERSION.length > 0) {
+                versionListFromBackend = json.VERSION;
+                activeVersionFromReadAPI = {
+                    VERSION_NO: json.VERSION[0].VERSION_NO,
+                    VERSION_NAME: json.VERSION[0].VERSION_NAME,
+                    VERSION_DESCRIPTION: json.VERSION[0].VERSION_DESCRIPTION
+                };
+            }
+            updateHeader(selection);
+            handleGospReadResponse(json);
+            renderAreaFilterOptions();
+        } catch (error) {
+            console.error("read_api Call Failed:", error);
+            toastr.error(`Failed to load data from backend.\n${error}`);
+        } finally {
+            $("#loadingSpinner").fadeOut();
+        }
+    };
+
+    $("#resetAdjustmentsBtn").on("click", function () {
+        $("#resetAdjustmentsConfirmModal").modal("show");
+    });
+
+    $("#confirmResetAdjustmentsBtn").on("click", function () {
+        const grid = $("#gospGrid1").dxDataGrid("instance");
+        const data = grid.option("dataSource");
+
+        const currentDay = currentDate.date();
+
+        data.forEach(row => {
+            const rowDay = parseInt(row.date);
+            if (rowDay >= currentDay) {
+                selection.areas.forEach(area => {
+                    selection.gosps.forEach(gosp => {
+                        row[`adj_${area}_${gosp}`] = null;
+                    });
+                });
+            }
+        });
+
+        grid.refresh();
+        $("#resetAdjustmentsConfirmModal").modal("hide");
+        toastr.success("GOSP adjustments reset successfully.");
+    });
+
+    function handleGospReadResponse(json) {
+        const AREA_TO_GOSPS = {};
+
+        originalGOSPData.forEach(row => {
+            if (!AREA_TO_GOSPS[row.PLANT_AREA_CODE]) {
+                AREA_TO_GOSPS[row.PLANT_AREA_CODE] = new Set();
+            }
+            AREA_TO_GOSPS[row.PLANT_AREA_CODE].add(row.GOSP_CODE);
+        });
+
+        // Convert sets to arrays
+        Object.keys(AREA_TO_GOSPS).forEach(area => {
+            AREA_TO_GOSPS[area] = Array.from(AREA_TO_GOSPS[area]);
+        });
+
+        const gospData = json.GOSP_DATA;
+        originalGOSPData = json.GOSP_DATA || [];
+        const totalProdMap = {};
+        gaugedFactors = {};
+
+        (json.GAUGE_FACTOR || []).forEach(item => {
+            gaugedFactors[item.GOSP_CODE] = item.GAUGE_FACTOR ?? 1;
+        });
+
+        window.lastReadGaugeFactors = (json.GAUGE_FACTOR || []);
+
+        (json.TOT_PROD_DATA || []).forEach(r => {
+            const day = r.DATE_VALUE;
+            totalProdMap[day] = r.TOTAL_PRODUCTION_QTY;
+        });
+
+        const filtered = gospData.filter(r =>
+            selection.products.includes(r.PRODUCT_CODE) &&
+            selection.areas.includes(r.PLANT_AREA_CODE) &&
+            selection.gosps.includes(r.GOSP_CODE)
+        );
+
+        const byDate = {};
+
+        filtered.forEach(r => {
+            const dateKey = r.DATE_VALUE;
+
+            if (!byDate[dateKey]) {
+                byDate[dateKey] = {
+                    date: dateKey,
+                    totalProduction: totalProdMap[dateKey] || 0
+                };
+            }
+
+            const key = `act_${r.PLANT_AREA_CODE}_${r.GOSP_CODE}`;
+            byDate[dateKey][key] = (byDate[dateKey][key] || 0) + (r.ACTUAL_QTY || 0);
+        });
+
+        const dataSource = Object.values(byDate).map(row => {
+            selection.areas.forEach(area => {
+                selection.gosps.forEach(gosp => {
+                    const matched = originalGOSPData.find(r =>
+                        r.DATE_VALUE == row.date &&
+                        r.PLANT_AREA_CODE === area &&
+                        r.GOSP_CODE === gosp &&
+                        r.PRODUCT_CODE === selection.products[0]
+                    );
+
+                    const userVal = userAdjustedValues[row.date]?.[`adj_${area}_${gosp}`];
+                    row[`adj_${area}_${gosp}`] = userVal !== undefined ? userVal : (matched?.ADJUSTED_QTY ?? 0);
+                });
+            });
+            return row;
+        });
+
+        const mtdByGosp = {};
+        const mbdByGosp = {};
+        const avgVarianceByGosp = {};
+        const dailySumsByGosp = {};
+
+        dataSource.forEach(row => {
+            const rowDate = moment(row.date, "DDMMMYYYY");
+            const isMonthToDate = rowDate.isSameOrBefore(currentDate, "day");
+
+            selection.areas.forEach(area => {
+                selection.gosps.forEach(gosp => {
+                    const key = `act_${area}_${gosp}`;
+                    const val = row[key] || 0;
+
+                    if (!dailySumsByGosp[gosp]) {
+                        dailySumsByGosp[gosp] = {
+                            mtdSum: 0,
+                            mbdSum: 0,
+                            mtdDays: 0,
+                            mbdDays: 0,
+                            varianceSum: 0,
+                            varianceDays: 0
+                        };
+                    }
+
+                    if (isMonthToDate) {
+                        dailySumsByGosp[gosp].mtdSum += val;
+                        dailySumsByGosp[gosp].mtdDays += 1;
+                    }
+
+                    dailySumsByGosp[gosp].mbdSum += val;
+                    dailySumsByGosp[gosp].mbdDays += 1;
+
+                    const dailySum = selection.areas.reduce((sum, area) => {
+                        const key = `act_${area}_${gosp}`;
+                        return sum + (row[key] || 0);
+                    }, 0);
+                    const variance = Math.abs(dailySum - (row.totalProduction || 0));
+                    dailySumsByGosp[gosp].varianceSum += variance;
+                    dailySumsByGosp[gosp].varianceDays += 1;
+                });
+            });
+        });
+
+        selection.gosps.forEach(gosp => {
+            const sums = dailySumsByGosp[gosp] || {
+                mtdSum: 0,
+                mbdSum: 0,
+                mtdDays: 0,
+                mbdDays: 0,
+                varianceSum: 0,
+                varianceDays: 0
+            };
+            mtdByGosp[gosp] = sums.mtdDays > 0 ? sums.mtdSum / sums.mtdDays : 0;
+            mbdByGosp[gosp] = sums.mbdDays > 0 ? sums.mbdSum / sums.mbdDays : 0;
+            avgVarianceByGosp[gosp] = sums.varianceDays > 0 ? sums.varianceSum / sums.varianceDays : 0;
+        });
+
+        function renderKpiCard(title, dataMap) {
+            const headers = selection.gosps.map(g => `<th>${g}</th>`).join("");
+            const values = selection.gosps
+                .map(g => `<td>${(dataMap[g] || 0).toFixed(2)}</td>`)
+                .join("");
+
+            const cardHtml = `
+            <div class="kpi-card">
+              <div class="card-title">${title}</div>
+                <div class="kpi-table-wrapper">
+                  <table class="table table-sm table-borderless text-center mb-0">
+                    <thead>
+                      <tr class="kpi-header-row">${headers}</tr>
+                    </thead>
+                    <tbody>
+                      <tr>${values}</tr>
+                    </tbody>
+                  </table>
+                </div>
+            </div>`;
+
+            $("#kpiScrollContainer").append(cardHtml);
+        }
+
+        $("#kpiScrollContainer").empty();
+        renderKpiCard("MTD (Avg)", mtdByGosp);
+        renderKpiCard("MBD (Avg)", mbdByGosp);
+        renderKpiCard("Average Production Variance", avgVarianceByGosp);
+
+        $("#kpiScrollContainer").empty();
+        renderKpiCard("MTD (Avg)", mtdByGosp);
+        renderKpiCard("MBD (Avg)", mbdByGosp);
+        renderKpiCard("Average Production Variance", avgVarianceByGosp);
+
+        const columns = [
+            {
+                dataField: "date",
+                caption: "Date",
+                allowEditing: false,
+                allowSorting: false,
+                width: 100,
+                alignment: "center",
+                fixed: true,
+                fixedPosition: "left"
+            }
+        ];
+
+        selection.areas.forEach(area => {
+            const gosps = [...new Set(originalGOSPData
+                .filter(r => r.PLANT_AREA_CODE === area && selection.gosps.includes(r.GOSP_CODE))
+                .map(r => r.GOSP_CODE))];
+
+            columns.push({
+                caption: area,
+                columns: gosps.flatMap(gosp => ([
+                    {
+                        caption: gosp,
+                        dataField: `act_${area}_${gosp}`,
+                        alignment: "center",
+                        allowSorting: false,
+                        allowEditing: false,
+                        width: 140
+                    },
+                    {
+                        caption: `${gosp} Adjustment`,
+                        dataField: `adj_${area}_${gosp}`,
+                        alignment: "center",
+                        allowEditing: true,
+                        allowSorting: false,
+                        editorType: "dxNumberBox",
+                        width: 140,
+                        editorOptions: {
+                            inputAttr: {
+                                style: "background-color: #e8f0fe; font-weight: bold;"
+                            },
+                            format: "#,##0"
+                        },
+                        validationRules: [],
+                        cellTemplate: function (container, options) {
+                            const val = options.data[options.column.dataField];
+                            container.text(formatSmartDecimal(val));
+                        },
+                        calculateCellValue: row => row[`adj_${area}_${gosp}`] ?? 0
+                    }
+                ]))
+            });
+        });
+
+        function formatSmartDecimal(val) {
+            const num = Number(val || 0);
+            return num.toLocaleString("en-US", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            });
+        }
+
+        columns.push(
+            {
+                caption: "Sum",
+                alignment: "center",
+                allowSorting: false,
+                allowEditing: false,
+                fixed: true,
+                fixedPosition: "right",
+                width: 140,
+                calculateCellValue: row => formatSmartDecimal(
+                    selection.areas.flatMap(area =>
+                        selection.gosps.map(gosp =>
+                            (row[`act_${area}_${gosp}`] || 0) + (row[`adj_${area}_${gosp}`] || 0)
+                        )
+                    ).reduce((a, b) => a + b, 0)
+                )
+            },
+            {
+                caption: "Sum with Gauged Factor",
+                alignment: "center",
+                allowSorting: false,
+                allowEditing: false,
+                fixed: true,
+                fixedPosition: "right",
+                width: 140,
+                headerCellTemplate: function (container) {
+                    $(container).html("<div style='white-space:normal; line-height:1.2;'>Sum with<br>Gauged Factor</div>");
+                },
+                calculateCellValue: row => {
+                    const sum = selection.areas.flatMap(area =>
+                        selection.gosps.map(gosp => {
+                            const actual = row[`act_${area}_${gosp}`] || 0;
+                            const adj = row[`adj_${area}_${gosp}`] || 0;
+                            const factor = gaugedFactors[gosp] || 1;
+                            return (actual + adj) * factor;
+                        })
+                    ).reduce((a, b) => a + b, 0);
+                    return formatSmartDecimal(sum);
+                }
+            },
+            {
+                caption: "Total Production",
+                dataField: "totalProduction",
+                allowEditing: false,
+                allowSorting: false,
+                alignment: "center",
+                fixed: true,
+                fixedPosition: "right",
+                width: 140,
+                headerCellTemplate: function (container) {
+                    $(container).html("<div style='white-space:normal; line-height:1.2;'>Total<br>Production</div>");
+                },
+                calculateCellValue: row => formatSmartDecimal(row.totalProduction)
+            },
+            {
+                caption: "Production Variance",
+                alignment: "center",
+                allowSorting: false,
+                allowEditing: false,
+                fixed: true,
+                fixedPosition: "right",
+                width: 140,
+                headerCellTemplate: function (container) {
+                    $(container).html("<div style='white-space:normal; line-height:1.2;'>Production<br>Variance</div>");
+                },
+                calculateCellValue: row => {
+                    const sum = selection.areas.flatMap(area =>
+                        selection.gosps.map(gosp =>
+                            (row[`act_${area}_${gosp}`] || 0) + (row[`adj_${area}_${gosp}`] || 0)
+                        )
+                    ).reduce((a, b) => a + b, 0);
+                    return formatSmartDecimal(sum - (row.totalProduction || 0));
+                }
+            },
+            {
+                caption: "Gauged Variance",
+                alignment: "center",
+                allowSorting: false,
+                allowEditing: false,
+                fixed: true,
+                fixedPosition: "right",
+                width: 140,
+                headerCellTemplate: function (container) {
+                    $(container).html("<div style='white-space:normal; line-height:1.2;'>Gauged<br>Variance</div>");
+                },
+                calculateCellValue: row => {
+                    const sum = selection.areas.flatMap(area =>
+                        selection.gosps.map(gosp => {
+                            const actual = row[`act_${area}_${gosp}`] || 0;
+                            const adj = row[`adj_${area}_${gosp}`] || 0;
+                            const factor = gaugedFactors[gosp] || 1;
+                            return (actual + adj) * factor;
+                        })
+                    ).reduce((a, b) => a + b, 0);
+                    return formatSmartDecimal(sum - (row.totalProduction || 0));
+                }
+            }
+        );
+
+        try {
+            const instance = $("#gospGrid1").dxDataGrid("instance");
+            if (instance) {
+                instance.dispose();
+                $("#gospGrid1").empty();
+            }
+        } catch (err) {
+            $("#gospGrid1").empty();
+        }
+
+        $("#gospGrid1").dxDataGrid({
+            dataSource,
+            columns,
+            showBorders: true,
+            columnAutoWidth: true,
+            scrolling: {
+                scrollByContent: true,
+                scrollByThumb: true,
+                showScrollbar: "onHover"
+            },
+            columnFixing: {
+                enabled: true
+            },
+            paging: false,
+            height: "auto",
+            editing: {
+                mode: "cell",
+                allowUpdating: true
+            },
+            onCellPrepared: function (e) {
+                const rowDate = parseInt(e.data?.date);
+                const gridDate = moment(`${rowDate}${selection.month}`, "DMMMYYYY");
+                const isPast = gridDate.isBefore(currentDate, "day");
+                const isAdj = e.column.dataField?.startsWith("adj_");
+
+                if (e.rowType === "data" && isAdj) {
+                    e.cellElement.css({
+                        backgroundColor: isPast ? "#f5f5f5" : "#fff8dc",
+                        cursor: isPast ? "not-allowed" : "text",
+                        color: isPast ? "#999" : ""
+                    });
+                }
+            },
+            onEditorPreparing: function (e) {
+                if (e.parentType === "dataRow" && e.dataField?.startsWith("adj_")) {
+                    const rowDate = parseInt(e.row?.data?.date);
+                    const gridDate = moment(`${rowDate}${selection.month}`, "DMMMYYYY");
+                    if (gridDate.isBefore(currentDate, "day")) e.cancel = true;
+                }
+            },
+        });
+    }
+    callGOSPReadAPI();
+});

@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Lifting Amendment Simulator</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="csrf-token" content="{{ csrf_token() }}" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    />
+
+    <link rel="icon" type="image/x-icon" href="../img/favicon.ico" />
+
+    <link rel="stylesheet" href="../css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../css/bootstrap-datepicker.min.css" />
+
+    <script src="../js/jquery.min.js"></script>
+    <script src="../js/popper.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/bootstrap-datepicker.min.js"></script>
+
+    <script src="../js/jspdf.umd.min.js"></script>
+    <script src="../js/jspdf.plugin.autotable.min.js"></script>
+
+    <link rel="stylesheet" href="../css/fontawesome-all.min.css" />
+
+    <!-- Toast -->
+    <link rel="stylesheet" href="../css/toastr.min.css" />
+    <script src="../js/toastr.min.js"></script>
+
+    <script>
+      window.jQuery ||
+        document.write(
+          decodeURIComponent('%3Cscript src="js/jquery.min.js"%3E%3C/script%3E')
+        );
+    </script>
+
+    <link rel="stylesheet" type="text/css" href="../css/dx.light.css" />
+    <script src="../js/dx.all.js"></script>
+    <script src="../js/moment.min.js"></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="../css/lifting-amendment-detail-view-two.css"
+    />
+    <link rel="stylesheet" type="text/css" href="../css/styles.css" />
+    <script type="text/javascript" src="../js/Chart.min.js"></script>
+
+    <style>
+      .dx-datagrid-headers .dx-datagrid-table .dx-row > td {
+        text-align: center !important;
+      }
+    </style>
+  </head>
+
+  <body class="dx-viewport">
+    <!--  Loading Spinner -->
+    <div id="loadingSpinner" class="spinner-overlay" style="display: none">
+      <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
+
+    <div id="allComments"></div>
+    <div id="popup">
+      <div id="popup-textarea-container"></div>
+      <div id="popup-submit-button"></div>
+    </div>
+    <header id="app-header">
+      <a href="./lifting-amendment.html"><i class="fa fa-home fa-2x"></i></a>
+      <div class="ml-2 title">
+        Lifting Amendment Simulator&nbsp;
+        <span class="" id="datepicker1"></span>
+      </div>
+      <img src="../img/SA_logo.jpg" alt="logo" class="logo" />
+    </header>
+    <div class="header-border"></div>
+    <div class="container-fluid">
+      <!-- Action Dropdown -->
+      <div class="action-floating-wrapper">
+        <div class="dropdown action-dropdown">
+          <button
+            class="btn btn-primary dropdown-toggle"
+            type="button"
+            id="actionDropdown"
+            data-toggle="dropdown"
+            aria-haspopup="true"
+            aria-expanded="false"
+          >
+            Action
+          </button>
+          <ul class="dropdown-menu" aria-labelledby="actionDropdown">
+            <!-- Terminal Avails -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item dropdown-toggle" href="#"
+                >Terminal Avails</a
+              >
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" href="#" id="fetchLatestDataBtn"
+                    >Fetch Latest Data</a
+                  >
+                </li>
+                <li>
+                  <a class="dropdown-item" href="#" id="fetchGospAvailsBtn"
+                    >Fetch GOSP Simulated Avails</a
+                  >
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item disabled"
+                    href="#"
+                    id="compareSimulatedClosingBtn"
+                    >Compare Simulated Closing</a
+                  >
+                </li>
+              </ul>
+            </li>
+
+            <!-- Inventory Settings -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item dropdown-toggle" href="#"
+                >Inventory Settings</a
+              >
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" href="#" id="btnOpeningInventory"
+                    >Opening Inventory</a
+                  >
+                </li>
+                <li>
+                  <a class="dropdown-item" href="#" id="btnWorkingCapacity"
+                    >Working Capacity</a
+                  >
+                </li>
+                <li>
+                  <a class="dropdown-item" href="#" id="btnInventoryPlanning"
+                    >Inventory Planning %</a
+                  >
+                </li>
+              </ul>
+            </li>
+
+            <!-- Spot Sales -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item dropdown-toggle" href="#">Spot Sales</a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" href="#" id="findSpotOpportunityBtn"
+                    >Find Spot Opportunity</a
+                  >
+                </li>
+              </ul>
+            </li>
+
+            <!-- Lifting Amendment -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item dropdown-toggle" href="#"
+                >Lifting Amendment</a
+              >
+              <ul class="dropdown-menu">
+                <li>
+                  <a
+                    class="dropdown-item disabled"
+                    href="#"
+                    id="optimizeCustomerAmendmentRequestsBtn"
+                    >Optimize Customer Amendment Requests</a
+                  >
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="#"
+                    id="customerAmendmentRequestsBtn"
+                    >Select Customer Amendment Requests</a
+                  >
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Adding overflow-x-auto to container ensures horizontal scroll on small screens -->
+      <div
+        class="row align-items-center justify-content-between mt-2 flex-nowrap overflow-auto"
+      >
+        <!-- Group 1: Big Icon Buttons -->
+        <div
+          class="col-auto bottom-buttons d-flex align-items-center flex-shrink-0"
+        >
+          <button
+            id="openButton"
+            class="btn btn-primary icon-btn-square"
+            title="Open"
+          >
+            <i class="fa fa-folder-open"></i> Open
+          </button>
+
+          <button
+            id="saveButton"
+            class="btn btn-primary icon-btn-square"
+            title="Save"
+          >
+            <i class="fa fa-save"></i> Save
+          </button>
+
+          <button
+            id="saveAsButton"
+            class="btn btn-primary icon-btn-square"
+            title="Save As"
+          >
+            <i class="fa fa-copy"></i> Save As
+          </button>
+
+          <div
+            style="
+              height: 32px;
+              width: 1px;
+              background-color: #ccc;
+              margin: 0 10px;
+            "
+          ></div>
+
+          <button
+            id="changeUnitBtn"
+            class="btn btn-info icon-btn-square"
+            title="Change Unit"
+          >
+            <i class="fa fa-exchange-alt"></i> Change Unit
+          </button>
+
+          <button
+            class="btn btn-danger icon-btn-square"
+            id="printToPDF"
+            title="PDF"
+          >
+            <i class="fa fa-file-pdf"></i> PDF
+          </button>
+
+          <button
+            id="resetAdjustmentsBtn"
+            class="btn btn-warning icon-btn-square text-dark"
+            title="Reset Adjustments"
+          >
+            <i class="fa fa-undo-alt"></i> Reset
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="separator-line"></div>
+
+    <!-- GOSP Simulated Avails Modal -->
+    <div
+      class="modal fade"
+      id="gospSimulatedAvailsModal"
+      tabindex="-1"
+      role="dialog"
+      aria-labelledby="gospSimulatedAvailsModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="gospSimulatedAvailsModalLabel">
+              Fetch GOSP Simulated Avails
+            </h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="table-responsive">
+              <table class="table table-bordered" id="gospAvailsTable">
+                <thead>
+                  <tr>
+                    <th>Product Code</th>
+                    <th>Select Version</th>
+                  </tr>
+                </thead>
+                <tbody id="gospAvailsTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+            <div
+              id="noGospDataMessage"
+              class="text-center"
+              style="display: none"
+            >
+              <p>No GOSP versions available.</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              id="cancelGospAvailsBtn"
+              data-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="updateGospAvailsBtn"
+            >
+              Update
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spot Opportunity Modal -->
+    <div
+      class="modal fade"
+      id="spotOpportunityModal"
+      tabindex="-1"
+      role="dialog"
+      aria-labelledby="spotOpportunityModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-md" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="spotOpportunityModalLabel">
+              Spot Opportunity Parameters
+            </h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <!-- Spot Parameters Toggle -->
+            <table class="table table-bordered" id="spotOpportunityTable">
+              <thead>
+                <tr>
+                  <th colspan="2">
+                    <button class="btn btn-toggle" id="toggleSpotParams">
+                      <i
+                        class="fa fa-chevron-right toggle-icon"
+                        id="iconSpotParams"
+                      ></i>
+                      Spot Opportunity Parameters
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="spotOpportunityBody" style="display: none">
+                <tr>
+                  <td>Maximum number of ship per day</td>
+                  <td>
+                    <input
+                      type="text"
+                      class="form-control small-input"
+                      id="inputMaxShipPerDay"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>Per Product Minimum Quantity (In MB)</td>
+                  <td>
+                    <input
+                      type="text"
+                      class="form-control small-input"
+                      id="inputMinProductQty"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>Per Product Maximum Quantity (In MB)</td>
+                  <td>
+                    <input
+                      type="text"
+                      class="form-control small-input"
+                      id="inputMaxProductQty"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>Maximum vessel size (In MB)</td>
+                  <td>
+                    <input
+                      type="text"
+                      class="form-control small-input"
+                      id="inputMaxVesselSize"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- SPOT Suggestions Toggle -->
+            <table class="table table-bordered" id="spotSuggestionsTable">
+              <thead>
+                <tr>
+                  <th colspan="4">
+                    <button class="btn btn-toggle" id="toggleSpotSuggestions">
+                      <i
+                        class="fa fa-chevron-right toggle-icon"
+                        id="iconSpotSuggestions"
+                      ></i>
+                      SPOT Suggestions
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="spotSuggestionsBody" style="display: none">
+                <tr id="noSuggestionsRow">
+                  <td colspan="4" class="text-center">
+                    No suggestions yet. Run optimization to generate.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="text-right mt-2">
+              <div class="text-right mt-2">
+                <button
+                  class="btn btn-primary"
+                  id="viewInScenarioSpotBtn"
+                  style="display: none"
+                  disabled
+                >
+                  View in Scenario
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="updateOptimizationBtn"
+            >
+              Update Optimization Parameter
+            </button>
+            <button
+              type="button"
+              class="btn btn-success"
+              id="runOptimizationBtn"
+            >
+              Run Optimization
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs and Buttons Section -->
+    <div class="container-fluid mt-3">
+      <div class="row align-items-center justify-content-between gx-2">
+        <!-- KPI Scroll Section -->
+        <div class="col overflow-auto ml-3" id="kpiScrollContainer">
+          <!-- KPI cards will be injected dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Confirmation Modal -->
+    <div
+      class="modal fade"
+      id="resetAdjustmentsConfirmModal"
+      tabindex="-1"
+      aria-labelledby="resetAdjustmentsConfirmLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title" id="resetAdjustmentsConfirmLabel">
+              Confirm Reset
+            </h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            Are you sure you want to reset all adjustments? This action cannot
+            be undone.
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-warning"
+              id="confirmResetAdjustmentsBtn"
+            >
+              Yes, Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Unit Modal -->
+    <div
+      class="modal fade"
+      id="changeUnitModal"
+      tabindex="-1"
+      role="dialog"
+      aria-labelledby="changeUnitModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="changeUnitModalLabel">Change Unit</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <!-- Unit selection dropdown -->
+            <div class="form-group">
+              <label for="unitSelect">Select Unit:</label>
+              <select id="unitSelect" class="form-control"></select>
+            </div>
+            <!-- Table for factor inputs -->
+            <table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Factor</th>
+                </tr>
+              </thead>
+              <tbody id="unitFactorTableBody">
+                <!-- Rows will be populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-warning" id="resetToMbBtn">
+              Reset to MB
+            </button>
+            <button type="button" class="btn btn-success" id="saveUnitChanges">
+              Save
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="updateUnitChanges"
+            >
+              Update
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              id="closeUnitModalBtn"
+              data-dismiss="modal"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main DataGrid -->
+    <div class="container-fluid mt-3">
+      <div class="row">
+        <div class="col">
+          <div id="tabpanel">
+            <div id="liftingAmendmentGrid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Opening Inventory Modal -->
+    <div class="modal fade" id="openingInventoryModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5>Opening Inventory</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div id="openingInventoryGrid"></div>
+          </div>
+          <div class="modal-footer">
+            <button
+              class="btn btn-sm btn-outline-danger"
+              id="resetOpeningInventory"
+            >
+              <i class="fa fa-undo mr-1"></i> Reset
+            </button>
+            <button
+              class="btn btn-sm btn-outline-success"
+              id="saveOpeningInventory"
+            >
+              <i class="fa fa-save mr-1"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Working Capacity Modal -->
+    <div class="modal fade" id="workingCapacityModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5>Working Capacity</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div id="workingCapacityGrid"></div>
+          </div>
+          <div class="modal-footer">
+            <button
+              class="btn btn-sm btn-outline-danger"
+              id="resetWorkingCapacity"
+            >
+              <i class="fa fa-undo mr-1"></i> Reset
+            </button>
+            <button
+              class="btn btn-sm btn-outline-success"
+              id="saveWorkingCapacity"
+            >
+              <i class="fa fa-save mr-1"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Planning Modal -->
+    <div class="modal fade" id="inventoryPlanningModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5>Inventory Planning %</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div id="inventoryPlanningGrid"></div>
+          </div>
+          <div class="modal-footer">
+            <button
+              class="btn btn-sm btn-outline-danger"
+              id="resetInventoryPlanning"
+            >
+              <i class="fa fa-undo mr-1"></i> Reset
+            </button>
+            <button
+              class="btn btn-sm btn-outline-success"
+              id="saveInventoryPlanning"
+            >
+              <i class="fa fa-save mr-1"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SAVE AS POPUP -->
+    <div
+      class="modal fade"
+      id="saveAsModal"
+      tabindex="-1"
+      role="dialog"
+      aria-labelledby="saveAsModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Save As</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form id="saveAsForm">
+              <div class="form-group">
+                <label for="saveName"
+                  >Name <span style="color: red">*</span></label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="saveName"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="saveDescription">Description</label>
+                <textarea
+                  class="form-control"
+                  id="saveDescription"
+                  rows="3"
+                ></textarea>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              id="saveAsSubmitBtn"
+              type="submit"
+              form="saveAsForm"
+              class="btn btn-primary"
+            >
+              <span
+                class="spinner-border spinner-border-sm d-none"
+                role="status"
+                aria-hidden="true"
+                id="saveAsLoadingSpinner"
+              ></span>
+              <span id="saveAsBtnText">Save</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPEN DROPDOWN -->
+    <div
+      class="modal fade"
+      id="openVersionModal"
+      tabindex="-1"
+      role="dialog"
+      aria-labelledby="openVersionModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Open Saved Version</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="versionSelect">Select a Version</label>
+              <select class="form-control" id="versionSelect"></select>
+            </div>
+            <div
+              id="noVersionsMessage"
+              class="text-muted"
+              style="display: none"
+            >
+              No saved versions available.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              id="confirmOpenVersion"
+              type="button"
+              class="btn btn-primary"
+            >
+              Open
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADJUSTED NOMINATION POPUP -->
+    <div
+      class="modal fade"
+      id="adjustedNominationsModal"
+      tabindex="-1"
+      role="dialog"
+    >
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Adjusted Nominations Details</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <table class="table table-bordered table-sm text-center">
+              <thead>
+                <tr>
+                  <th>Nomination Number</th>
+                  <th>Customer</th>
+                  <th>Ship</th>
+                  <th>Original Date</th>
+                  <th>New Date</th>
+                  <th>Action</th>
+                  <th>Reset</th>
+                </tr>
+              </thead>
+              <tbody id="adjustedNominationsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customer Amendment Requests Modal -->
+    <div
+      class="modal fade"
+      id="customerAmendmentModal"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Customer Amendment Requests</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span>×</span>
+            </button>
+          </div>
+          <div class="modal-body p-0">
+            <div class="amendment-table-wrapper">
+              <table
+                id="customerAmendmentTable"
+                class="table table-striped mb-0"
+              >
+                <thead>
+                  <tr>
+                    <th>Nomination Details</th>
+                    <th>Requested Type</th>
+                    <th>
+                      Apply Both <input type="checkbox" id="checkAllBoth" />
+                    </th>
+                    <th>
+                      Apply Quantity <input type="checkbox" id="checkAllQty" />
+                    </th>
+                    <th>
+                      Apply Date Change
+                      <input type="checkbox" id="checkAllDate" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="sendEmailBtn" class="btn btn-success">
+              SEND EMAIL
+            </button>
+            <button id="viewInScenarioBtn" class="btn btn-primary">
+              VIEW IN SCENARIO
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              id="closeUnitModalBtn"
+              data-dismiss="modal"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT BOT -->
+    <link rel="stylesheet" href="../chatbot-app/chatbot.css" />
+
+    <div id="chat-launcher">
+      <span>🤖</span>
+    </div>
+
+    <div id="chatbot-panel" style="display: none">
+      <div class="chat-container">
+        <div id="lifty-header">
+          <span>
+            🤖 Lifty <span class="status-dot" title="Online"></span>
+          </span>
+          <button id="close-chatbot" title="Close">&times;</button>
+        </div>
+        <div id="chatbox"></div>
+        <div id="chatbot-input-area">
+          <textarea
+            id="userInput"
+            rows="1"
+            placeholder="Type your message..."
+          ></textarea>
+          <button id="send-btn" title="Send"><b>&#10148;</b></button>
+        </div>
+      </div>
+    </div>
+
+    <script
+      type="module"
+      src="../js/lifting-amendment-detail-view-two.js"
+    ></script>
+
+    <script src="../chatbot-app/fuse.js"></script>
+    <script type="module" src="../chatbot-app/chatbot.js"></script>
+    <script src="../chatbot-app/chrono.js"></script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        document.getElementById("chat-launcher").onclick = function () {
+          const panel = document.getElementById("chatbot-panel");
+          panel.style.display =
+            panel.style.display === "none" || panel.style.display === ""
+              ? "block"
+              : "none";
+          setTimeout(() => document.getElementById("userInput").focus(), 100);
+
+          if (!localStorage.getItem("hasSeenPrivacyNotice")) {
+            addChat(
+              "bot",
+              `🔔 <b>Privacy Notice:</b> To continually enhance your experience and the quality of our chatbot, we may use anonymous feedback from your questions and conversations for research and system improvement. This process follows strict privacy standards and ensures your input contributes to better service for everyone.
+              <br><br>
+                <button id="acceptConsentBtn" style="padding: 6px 12px; margin-top: 8px; background-color: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                  Ok
+               </button>`
+            );
+
+            // Attach button handler after a short delay (to ensure it's rendered)
+            setTimeout(() => {
+              const btn = document.getElementById("acceptConsentBtn");
+              if (btn) {
+                btn.onclick = function () {
+                  const bubbles = document.querySelectorAll(".chat-bubble.bot");
+                  bubbles.forEach((bubble) => {
+                    if (bubble.innerHTML.includes("Privacy Notice")) {
+                      bubble.remove();
+                    }
+                  });
+                  localStorage.setItem("hasSeenPrivacyNotice", "true");
+                };
+              }
+            }, 100);
+          }
+        };
+
+        document.getElementById("close-chatbot").onclick = function () {
+          document.getElementById("chatbot-panel").style.display = "none";
+        };
+
+        // Send on Enter, newline on Shift+Enter
+        const input = document.getElementById("userInput");
+        const sendBtn = document.getElementById("send-btn");
+
+        input.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendBtn.click();
+          }
+        });
+
+        sendBtn.onclick = function () {
+          sendMessage();
+          input.focus();
+        };
+
+        // Adjust textarea height automatically
+        input.addEventListener("input", function () {
+          input.style.height = "auto";
+          input.style.height = input.scrollHeight + "px";
+        });
+      });
+    </script>
+  </body>
+</html>
