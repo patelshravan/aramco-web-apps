@@ -6,6 +6,60 @@ $(document).ready(function () {
   let customerAmendmentModalInstance = null;
   let latestAmendmentRequests = [];
   let gospVersions = [];
+  let userCheckCancelled = false;
+  window.processId = Date.now();
+
+  // USER LOGGED IN CHECK
+  function startUserCheckPolling(payload) {
+    userCheckCancelled = false;
+
+    async function poll() {
+      if (userCheckCancelled) return;
+
+      try {
+        console.log("Checking active users with payload:", payload);
+        const csrfToken = await fetchCSRFToken();
+        const response = await fetch(`${BASE_URL}${API_ENDPOINTS.INVPROJ_CONCURRENT_USER}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": csrfToken,
+          },
+          body: JSON.stringify(payload),
+          credentials: "include",
+        });
+
+        const data = await response.json();
+        handleActiveUsersResponse(data);
+      } catch (error) {
+        console.error("User check polling failed:", error);
+      } finally {
+        // Immediately call again once current request is complete
+        poll();
+      }
+    }
+
+    poll();
+  }
+
+  function handleActiveUsersResponse(apiResponse) {
+    const data = apiResponse?.DATA || [];
+
+    if (!Array.isArray(data) || data.length === 0) {
+      console.log("No active users found in response. Save is enabled.");
+      $("#saveButton").prop("disabled", false).attr("title", "");
+      return;
+    }
+
+    // One or more users received in DATA
+    const users = data.map(item => item.USER_NM);
+    const userList = users.join(", ");
+    const verb = users.length === 1 ? "is" : "are";
+    const msg = `${userList} ${verb} already logged in`;
+
+    console.log("Active users from response:", users);
+    $("#saveButton").prop("disabled", true).attr("title", msg);
+  }
 
   // Toggle submenus on click
   $('.dropdown-submenu > a').on('click', function (e) {
@@ -183,6 +237,26 @@ $(document).ready(function () {
     }
   });
 
+  // Compare Simulated Closing Button
+  $("#compareSimulatedClosingBtn").on("click", function (e) {
+    e.preventDefault();
+    const baseUrl = API_ENDPOINTS.COMPARE_SIMULATED_CLOSING_URL.split('&pr483=')[0];
+
+    const [monthStr, yearStr] = selection.month.split(" ");
+    const monthMap = {
+      Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+    };
+    const jsDate = new Date(parseInt(yearStr), monthMap[monthStr], 2);
+    const excelEpoch = new Date(1899, 11, 31);
+    const diffDays = Math.floor((jsDate - excelEpoch) / (1000 * 60 * 60 * 24));
+    const pr483 = diffDays - 21916;
+    const encodeForParam = str => (str || '').toUpperCase().replace(/ /g, '%2520');
+    const pr484 = encodeForParam(selection.terminal);
+    const pr485 = encodeForParam(selection.productGroup);
+
+    const url = `${baseUrl}&pr483=${pr483}&pr484=${pr484}&pr485=${pr485}`;
+    window.open(url, "_blank");
+  });
 
   // Spot Opportunity
   $("#findSpotOpportunityBtn").on("click", function () {
@@ -502,7 +576,7 @@ $(document).ready(function () {
           const anySelected = Object.values(window.spotSuggestionSelections).some(v => v);
           $("#viewInScenarioSpotBtn").prop("disabled", !anySelected);
 
-          // Enable/disable this row’s Reset button
+          // Enable/disable this row's Reset button
           const $resetBtn = $row.find('.reset-spot-btn');
           $resetBtn.prop('disabled', !isChecked);
         });
@@ -795,7 +869,7 @@ $(document).ready(function () {
       $tbody.append($tr);
     });
 
-    // 5) Re-attach “check all” handlers
+    // 5) Re-attach "check all" handlers
     $("#checkAllBoth").off("change").on("change", () => {
       $(".apply-both-checkbox").prop("checked", $("#checkAllBoth").is(":checked"));
     });
@@ -828,7 +902,7 @@ $(document).ready(function () {
     $("#viewInScenarioBtn, #sendEmailBtn").prop("disabled", !anyChecked);
   }
 
-  // wire up ALL the checkboxes: the per-row ones AND the header “check all” boxes
+  // wire up ALL the checkboxes: the per-row ones AND the header "check all" boxes
   $(document).off("change", "#checkAllBoth, #checkAllQty, #checkAllDate, .apply-both-checkbox, .apply-qty-checkbox, .apply-date-checkbox");
   $(document).on(
     "change",
@@ -2532,214 +2606,98 @@ $(document).ready(function () {
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 10;
+    const margin = 15;
     const usableWidth = pageWidth - 2 * margin;
+    const usableHeight = pageHeight - 2 * margin;
 
-    // Header
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Lifting Amendment Report", margin, 15);
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
+    // Header lines (common for all pages)
     const headerLines = [
       `Date: ${new Date().toLocaleDateString()}`,
       `Terminal: ${selection.terminal} | Group: ${selection.productGroup}`,
-      `Planning: ${selection.month} | Products: ${selection.products.join(
-        ", "
-      )}`,
-    ];
-    headerLines.forEach((line, index) => {
-      doc.text(line, margin, 22 + index * 5);
-    });
-
-    // KPI Summary
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("KPI Summary", margin, 40);
-
-    const kpiData = [
-      [
-        "Total Cargoes",
-        liftingAmendmentData.reduce((sum, r) => sum + r.numberOfShips, 0),
-      ],
-      [
-        "Violation Days",
-        liftingAmendmentData.filter((row) =>
-          selection.products.some((p) => {
-            const percent = parseInt(row[`closingPercentage_${p}`]) || 0;
-            const min = parseInt(inventoryPlanningData[0][p]);
-            const max = parseInt(inventoryPlanningData[1][p]);
-            return percent < min || percent > max;
-          })
-        ).length,
-      ],
+      `Planning: ${selection.month} | Products: ${selection.products.join(", ")}`,
     ];
 
-    doc.autoTable({
-      startY: 45,
-      head: [["Metric", "Value"]],
-      body: kpiData,
-      theme: "grid",
-      margin: { left: margin, right: margin },
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        font: "helvetica",
-      },
-      headStyles: {
-        fillColor: [200, 200, 200],
-        textColor: [0, 0, 0],
-        fontStyle: "bold",
-      },
-      columnStyles: {
-        0: { cellWidth: 40 },
-        1: { cellWidth: 30 },
-      },
-    });
+    // Loop through each product and create a page for each
+    selection.products.forEach((product, idx) => {
+      if (idx > 0) doc.addPage();
 
-    // Main Table
-    let columns = [{ header: "Date", dataKey: "date", width: 15 }];
-
-    selection.products.forEach((product) => {
-      columns.push(
-        {
-          header: `${product} Term`,
-          dataKey: `terminalAvails_${product}`,
-          width: 15,
-        },
-        { header: `Adj TA`, dataKey: `adjustment_${product}TA`, width: 15 },
-        { header: `Cust`, dataKey: `customerLifting_${product}`, width: 15 },
-        { header: `Adj CL`, dataKey: `adjustment_${product}CL`, width: 15 },
-        {
-          header: `Clos Inv`,
-          dataKey: `closingInventory_${product}`,
-          width: 18,
-        },
-        { header: `%`, dataKey: `closingPercentage_${product}`, width: 12 }
+      // Product Title
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Product: ${window.productNameMap?.[product] || product}`,
+        margin, margin + 2
       );
-    });
 
-    columns.push(
-      { header: "Ships", dataKey: "numberOfShips", width: 12 },
-      { header: "Total Lift", dataKey: "totalLifting", width: 15 },
-      { header: "Lift/2D", dataKey: "liftingPer2Days", width: 15 }
-    );
-
-    const tableData = liftingAmendmentData.map((row) => {
-      let rowData = {
-        date: String(row.date).padStart(2, "0"),
-      };
-      selection.products.forEach((product) => {
-        rowData[`terminalAvails_${product}`] =
-          row[`terminalAvails_${product}`]?.toLocaleString() || "0";
-        rowData[`adjustment_${product}TA`] =
-          row[`adjustment_${product}TA`]?.toLocaleString() || "0";
-        rowData[`customerLifting_${product}`] =
-          row[`customerLifting_${product}`]?.toLocaleString() || "0";
-        rowData[`adjustment_${product}CL`] =
-          row[`adjustment_${product}CL`]?.toLocaleString() || "0";
-        rowData[`closingInventory_${product}`] =
-          row[`closingInventory_${product}`]?.toLocaleString() || "0";
-        rowData[`closingPercentage_${product}`] =
-          row[`closingPercentage_${product}`] || "0%";
+      // Header Info
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      headerLines.forEach((line, i) => {
+        doc.text(line, margin, margin + 12 + i * 5);
       });
-      rowData.numberOfShips = row.numberOfShips?.toLocaleString() || "0";
-      rowData.totalLifting = row.totalLifting?.toLocaleString() || "0";
-      rowData.liftingPer2Days = row.liftingPer2Days?.toLocaleString() || "0";
-      return rowData;
-    });
 
-    // Calculate total width and split if necessary
-    const totalWidth = columns.reduce((sum, col) => sum + col.width, 0);
-    const maxColumnsPerPage = Math.floor(usableWidth / 12);
+      // Table columns for this product
+      const columns = [
+        { header: "Date", dataKey: "date", width: 15 },
+        { header: "Term", dataKey: `terminalAvails_${product}`, width: 18 },
+        { header: "Adj TA", dataKey: `adjustment_${product}TA`, width: 18 },
+        { header: "Cust", dataKey: `customerLifting_${product}`, width: 18 },
+        { header: "Adj CL", dataKey: `adjustment_${product}CL`, width: 18 },
+        { header: "Clos Inv", dataKey: `closingInventory_${product}`, width: 22 },
+        { header: "%", dataKey: `closingPercentage_${product}`, width: 14 },
+        { header: "Ships", dataKey: "numberOfShips", width: 14 },
+        { header: "Total Lift", dataKey: "totalLifting", width: 18 },
+        { header: "Lift/2D", dataKey: "liftingPer2Days", width: 18 },
+      ];
 
-    if (totalWidth > usableWidth) {
-      let startY = doc.lastAutoTable.finalY + 5;
-      const chunkSize = maxColumnsPerPage;
+      // Table data for this product
+      const tableData = liftingAmendmentData.map((row) => {
+        return {
+          date: formatDateMMDDYYYY(new Date(parseInt(yearStr), monthMap[monthStr], row.date)), [`terminalAvails_${product}`]: row[`terminalAvails_${product}`]?.toLocaleString() || "0",
+          [`adjustment_${product}TA`]: row[`adjustment_${product}TA`]?.toLocaleString() || "0",
+          [`customerLifting_${product}`]: row[`customerLifting_${product}`]?.toLocaleString() || "0",
+          [`adjustment_${product}CL`]: row[`adjustment_${product}CL`]?.toLocaleString() || "0",
+          [`closingInventory_${product}`]: row[`closingInventory_${product}`]?.toLocaleString() || "0",
+          [`closingPercentage_${product}`]: row[`closingPercentage_${product}`] || "0%",
+          numberOfShips: row.numberOfShips?.toLocaleString() || "0",
+          totalLifting: row.totalLifting?.toLocaleString() || "0",
+          liftingPer2Days: row.liftingPer2Days?.toLocaleString() || "0",
+        };
+      });
 
-      for (let i = 0; i < columns.length; i += chunkSize) {
-        const columnChunk = columns.slice(i, i + chunkSize);
-        const tableChunk = tableData.map((row) => {
-          const chunkRow = {};
-          columnChunk.forEach((col) => {
-            chunkRow[col.dataKey] = row[col.dataKey];
-          });
-          return chunkRow;
-        });
-
-        doc.autoTable({
-          startY: startY,
-          head: [columnChunk.map((col) => col.header)],
-          body: tableChunk.map((row) =>
-            columnChunk.map((col) => row[col.dataKey])
-          ),
-          theme: "grid",
-          margin: { left: margin, right: margin },
-          styles: {
-            fontSize: 6,
-            cellPadding: 1,
-            font: "helvetica",
-            overflow: "linebreak",
-          },
-          headStyles: {
-            fillColor: [200, 200, 200],
-            textColor: [0, 0, 0],
-            fontStyle: "bold",
-            fontSize: 6,
-          },
-          columnStyles: columnChunk.reduce((acc, col, index) => {
-            acc[index] = { cellWidth: col.width };
-            return acc;
-          }, {}),
-          didDrawPage: function (data) {
-            doc.setFontSize(8);
-            doc.text(
-              `Page ${data.pageNumber} - Part ${Math.floor(i / chunkSize) + 1}`,
-              pageWidth - margin - 30,
-              pageHeight - 5
-            );
-          },
-        });
-
-        startY = margin;
-        if (i + chunkSize < columns.length) {
-          doc.addPage();
-        }
-      }
-    } else {
+      // Table styling
       doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 5,
+        startY: margin + 30,
         head: [columns.map((col) => col.header)],
         body: tableData.map((row) => columns.map((col) => row[col.dataKey])),
         theme: "grid",
         margin: { left: margin, right: margin },
         styles: {
-          fontSize: 6,
-          cellPadding: 1,
+          fontSize: 8,
+          cellPadding: 2.5,
           font: "helvetica",
           overflow: "linebreak",
         },
         headStyles: {
-          fillColor: [200, 200, 200],
+          fillColor: [220, 220, 220],
           textColor: [0, 0, 0],
           fontStyle: "bold",
-          fontSize: 6,
         },
-        columnStyles: columns.reduce((acc, col, index) => {
-          acc[index] = { cellWidth: col.width };
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        columnStyles: columns.reduce((acc, col, i) => {
+          acc[i] = { cellWidth: col.width };
           return acc;
         }, {}),
         didDrawPage: function (data) {
-          doc.setFontSize(8);
+          // Page number at the bottom right
+          doc.setFontSize(9);
           doc.text(
-            `Page ${data.pageNumber}`,
-            pageWidth - margin - 20,
-            pageHeight - 5
+            `Page ${doc.internal.getNumberOfPages()}`,
+            pageWidth - margin - 15,
+            pageHeight - 7
           );
         },
       });
-    }
+    });
 
     doc.save(`Lifting_Amendment_${selection.month.replace(" ", "_")}.pdf`);
   }
@@ -2874,11 +2832,13 @@ $(document).ready(function () {
       onEditingStart: function (e) {
         const rowDay = parseInt(e.data.Date, 10);
 
+        // If the planning month is entirely in the past, block editing.
         if (planningDate < currentMonthDate) {
           e.cancel = true;
           return;
         }
 
+        // If the planning month is the current month, only allow editing on dates >= today.
         const isSameMonth =
           planningDate.getFullYear() === today.getFullYear() &&
           planningDate.getMonth() === today.getMonth();
@@ -2891,6 +2851,7 @@ $(document).ready(function () {
       onCellPrepared: function (e) {
         if (e.rowType !== "data") return;
 
+        // full JS Date for this row
         const cellDate = new Date(
           parseInt(yearStr),
           monthMap[monthStr],
@@ -2902,12 +2863,14 @@ $(document).ready(function () {
         todayZero.setHours(0, 0, 0, 0);
 
         if (cellDate < todayZero) {
+          // past rows → grey + block
           $(e.cellElement).css({
             backgroundColor: "#eee",
             color: "#999",
             cursor: "not-allowed",
           });
         } else {
+          // today/future → editable I-beam
           $(e.cellElement).css({
             cursor: "text",
           });
@@ -2929,6 +2892,7 @@ $(document).ready(function () {
 
       if (isInventoryPlanning) {
         if (isInternational) {
+          // International → group by LOCATION + PRODUCT
           const uniqueLocations = [...new Set(minMaxPercentageData.map(d => d.LOCATION))];
           const groupedByLocation = {};
           uniqueLocations.forEach(loc => {
@@ -2980,6 +2944,7 @@ $(document).ready(function () {
             ...locationColumns,
           ];
         } else {
+          // Domestic → only products (no location)
           const productColumns = selection.products.map(product => ({
             dataField: product,
             caption: window.productNameMap[product] || product,
@@ -3018,6 +2983,7 @@ $(document).ready(function () {
         }
       }
 
+      // ---------- DEFAULT FLOW for other grids ----------
       const dateCol =
         hasDate || selector === "#openingInventoryGrid"
           ? [{
@@ -3035,11 +3001,7 @@ $(document).ready(function () {
                 day
               );
               $(container).text(
-                fullDate.toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })
+                formatDateMMDDYYYY(fullDate)
               );
             },
           }]
@@ -3050,7 +3012,7 @@ $(document).ready(function () {
         const groupedByLocation = {};
 
         selection.products.forEach(product => {
-          (window.countryMap[product] || []).forEach(location => {
+          (countryMap[product] || []).forEach(location => {
             if (!groupedByLocation[location]) {
               groupedByLocation[location] = [];
             }
@@ -3082,39 +3044,64 @@ $(document).ready(function () {
                   .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
                   .text(Number(options.value || 0));
               },
+              headerCellTemplate: function (container, options) {
+                $(container).html(`
+                  <div style="display:flex; flex-direction:column; align-items:center;">
+                    <span>${window.productNameMap[product] || product}</span>
+                    <button class="btn btn-link p-0 m-0 working-capacity-bulk-btn" data-product="${product}" title="Bulk Edit Working Capacity" style="font-size:18px;line-height:1;">
+                      <i class="fa fa-sliders-h"></i>
+                    </button>
+                  </div>
+                `);
+              }
             })),
           })
         );
       } else {
-        mainColumns = selection.products.map(product => ({
-          dataField: product,
-          caption: window.productNameMap[product] || product,
-          alignment: "center",
-          editorType: "dxNumberBox",
-          allowEditing: editingEnabled,
-          allowSorting: false,
-          editorOptions: {
-            min: 0,
-            showSpinButtons: false,
-            format: "#,##0.##",
-            inputAttr: {
-              style: "background-color: #f6edc8; font-weight: bold;",
+        mainColumns = selection.products.map(product => {
+          const baseColumn = {
+            dataField: product,
+            caption: window.productNameMap[product] || product,
+            alignment: "center",
+            editorType: "dxNumberBox",
+            allowEditing: editingEnabled,
+            allowSorting: false,
+            editorOptions: {
+              min: 0,
+              showSpinButtons: false,
+              format: "#,##0.##",
+              inputAttr: {
+                style: "background-color: #f6edc8; font-weight: bold;",
+              },
             },
-          },
-          cellTemplate(container, options) {
-            const factor = unitConversionFactors?.[product] ?? 1;
-            const convertedValue = Number(options.value || 0) * factor;
-
-            $(container)
-              .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
-              .text(convertedValue.toLocaleString());
-          },
-        }));
+            cellTemplate(container, options) {
+              const factor = unitConversionFactors?.[product] ?? 1;
+              const convertedValue = Number(options.value || 0) * factor;
+              $(container)
+                .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
+                .text(convertedValue.toLocaleString());
+            }
+          };
+          // Only add the icon button for Working Capacity grid
+          if (selector === "#workingCapacityGrid") {
+            baseColumn.headerCellTemplate = function (container, options) {
+              $(container).html(`
+                <div style="display:flex; flex-direction:column; align-items:center;">
+                  <span>${window.productNameMap[product] || product}</span>
+                  <button class="btn btn-link p-0 m-0 working-capacity-bulk-btn" data-product="${product}" title="Bulk Edit Working Capacity" style="font-size:18px;line-height:1;">
+                    <i class="fa fa-sliders-h"></i>
+                  </button>
+                </div>
+              `);
+            };
+          }
+          return baseColumn;
+        });
       }
 
       return dateCol.concat(mainColumns);
     }
-  };
+  }
 
   function recalculateLiftingData(startIndex = 0) {
     if (!window.countryMap) {
@@ -3460,8 +3447,8 @@ $(document).ready(function () {
           <td>${nom.nominationNumber}</td>
           <td>${nom.customerName || "-"}</td>
           <td>${nom.shipName || "-"}</td>
-          <td>${originalDate}</td>
-          <td>${currentDate}</td>
+         <td>${formatDateMMDDYYYY(originalDate)}</td>
+          <td>${formatDateMMDDYYYY(currentDate)}</td>
           <td><strong>${action}</strong></td>
           <td><button class="btn btn-sm btn-warning reset-nomination-btn">Reset</button></td>
         </tr>
@@ -3669,6 +3656,34 @@ $(document).ready(function () {
   `);
     }
 
+    // Adjusted Avails (Terminal Avails Adjustments)
+    const adjustedAvailsMap = {};
+    productPairs.forEach(({ product, location }) => {
+      const adjustedAvails = liftingAmendmentData.reduce(
+        (sum, r) => {
+          const suffix = location ? `${product}_${location}` : product;
+          return sum + (Number(r[`adjustment_${suffix}TA`]) || 0);
+        },
+        0
+      );
+      const factor = currentUnit !== "MB" && unitConversionFactors[product] ? unitConversionFactors[product] : 1;
+      adjustedAvailsMap[`${location}_${product}`] = currentUnit === "MB" ? adjustedAvails : adjustedAvails * factor;
+    });
+
+    const adjustedAvailsRow = buildValueRow(adjustedAvailsMap);
+
+    container.append(`
+    <div class="${kpiCardClass}">
+      <div class="card-title">Adjusted Avails (${currentUnit})</div>
+      <div class="kpi-table-wrapper">
+        <table class="table table-sm text-center mb-0">
+          <thead><tr>${row1}</tr><tr>${row2}</tr></thead>
+          <tbody><tr>${adjustedAvailsRow}</tr></tbody>
+        </table>
+      </div>
+    </div>
+  `);
+
     // Adjusted Nominations (kept as global summary)
     let dateChangedCount = 0;
     let qtyChangedCount = 0;
@@ -3710,7 +3725,7 @@ $(document).ready(function () {
 
     container.append(`
     <div class="kpi-card" id="adjustedNominationsCard" style="cursor: pointer;">
-      <div class="card-title">Adjusted Nominations</div>
+      <div class="card-title">Adjustment</div>
       <div class="kpi-table-wrapper">
         <table class="table table-sm text-center mb-0">
           <thead><tr><th>Qty Changed</th><th>Date Changed</th></tr></thead>
@@ -3760,8 +3775,8 @@ $(document).ready(function () {
               <td>${nom.nominationNumber}</td>
               <td>${nom.customerName || "-"}</td>
               <td>${nom.shipName || "-"}</td>
-              <td>${originalDate}</td>
-              <td>${currentDate}</td>
+               <td>${formatDateMMDDYYYY(originalDate)}</td>
+          <td>${formatDateMMDDYYYY(currentDate)}</td>
               <td><strong>${action}</strong></td>
               <td><button class="btn btn-sm btn-warning reset-nomination-btn">Reset</button></td>
             </tr>
@@ -3799,12 +3814,12 @@ $(document).ready(function () {
     ];
 
     const sectionTitles = [
-      { key: "terminalAvails", title: "Terminal Avails" },
-      { key: "adjustment_TA", title: "Terminal Avails Adjustment" },
-      { key: "customerLifting", title: "Customer Liftings" },
-      { key: "adjustment_CL", title: "Customer Liftings Adjustment" },
-      { key: "closingInventory", title: "Closing Inventory" },
-      { key: "closingPercentage", title: "Closing Percentage" },
+      { key: "terminalAvails", title: "Avails" },
+      { key: "adjustment_TA", title: "Adjust" },
+      { key: "customerLifting", title: "Lifting" },
+      { key: "adjustment_CL", title: "Adjust" },
+      { key: "closingInventory", title: "Closing" },
+      { key: "closingPercentage", title: "%" },
     ];
 
     const isInternational = selection.terminal?.toLowerCase() === "international";
@@ -3963,6 +3978,18 @@ $(document).ready(function () {
           const raw = val * (currentUnit === "MB" ? 1 : factor);
           $(container).text(raw.toLocaleString());
         };
+        // Add bulk adjust icon button to header
+        columnConfig.headerCellTemplate = function (container, options) {
+          const type = sectionKey.endsWith("TA") ? "TA" : "CL";
+          $(container).html(`
+            <div style=\"display:flex; flex-direction:column; align-items:center;\">
+              <span>Adjust</span>
+              <button class=\"btn btn-link p-0 m-0 bulk-adjust-btn\" title=\"Bulk Adjust\" style=\"font-size:14px;line-height:1;\" data-type=\"${type}\" data-product=\"${product}\" data-location=\"${location}\">
+                <i class=\"fa fa-sliders-h\"></i>
+              </button>
+            </div>
+          `);
+        };
       } else if (sectionKey === "closingInventory") {
         columnConfig.cellTemplate = function (container, options) {
           const factor = unitConversionFactors[product] || 1;
@@ -4107,7 +4134,7 @@ $(document).ready(function () {
         enabled: true,
         template: function (container, options) {
           const details = options.data.nomination || [];
-          const parentRowDate = options.data.date; // The parent row’s original date
+          const parentRowDate = options.data.date; // The parent row's original date
 
           // Initialize DATE_VALUE_ADJ if not set
           details.forEach(function (nomination) {
@@ -4376,7 +4403,7 @@ $(document).ready(function () {
               const adjDay = options.data.DATE_VALUE_ADJ;
               if (typeof adjDay === "number" && adjDay > 0 && adjDay <= 31) {
                 const date = new Date(parseInt(yearStr), monthMap[monthStr], adjDay);
-                $(container).text(date.toLocaleDateString("en-GB"));
+                $(container).text(formatDateMMDDYYYY(date));
               } else {
                 $(container).text("");
               }
@@ -4508,4 +4535,212 @@ $(document).ready(function () {
     window.inventoryPlanningData = inventoryPlanningData;
     window.generatePDF = generatePDF;
   };
+
+  // --- Keep session alive by pinging SASLogon every 3 minutes ---
+  function keepSessionAlive() {
+    fetch(`${BASE_URL}/SASLogon/`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    }).then(res => {
+      if (!res.ok) {
+        console.warn('Keep-alive failed:', res.status);
+      }
+    }).catch(err => {
+      console.error('Keep-alive error:', err);
+    });
+  }
+  setInterval(keepSessionAlive, 180000); // 3 minutes
+
+  // Add event handler for bulk adjust button
+  $(document).on('click', '.bulk-adjust-btn', function () {
+    $('#bulkAdjustType').val($(this).data('type'));
+    $('#bulkAdjustProduct').val($(this).data('product'));
+    $('#bulkAdjustLocation').val($(this).data('location'));
+    $('#bulkAdjustValue').val('');
+
+    // Initialize date pickers when modal is shown
+    $('#bulkAdjustModal').on('shown.bs.modal', function () {
+      initializeBulkDatePickers();
+    });
+
+    $('#bulkAdjustModal').modal('show');
+  });
+
+  // Apply bulk adjustment
+  $(document).on('click', '#applyBulkAdjust', function () {
+    const fromDate = $('#bulkFromDatePicker').dxDateBox('instance').option('value');
+    const toDate = $('#bulkToDatePicker').dxDateBox('instance').option('value');
+    const value = parseFloat($('#bulkAdjustValue').val());
+    const type = $('#bulkAdjustType').val(); // "TA", "CL", or "WC"
+    const product = $('#bulkAdjustProduct').val();
+    const location = $('#bulkAdjustLocation').val();
+
+    if (!fromDate || !toDate || isNaN(value)) {
+      toastr.error("Please fill all fields.");
+      return;
+    }
+
+    const from = fromDate.getDate();
+    const to = toDate.getDate();
+
+    if (isNaN(from) || isNaN(to) || isNaN(value)) {
+      toastr.error("Please fill all fields.");
+      return;
+    }
+
+    if (type === "WC") {
+      // Bulk update for Working Capacity modal
+      workingCapacityData.forEach(row => {
+        if (row.Date >= from && row.Date <= to) {
+          row[product] = value;
+        }
+      });
+      // Refresh the grid
+      $("#workingCapacityGrid").dxDataGrid("instance").refresh();
+      toastr.success("Working Capacity updated!");
+    } else {
+      // Bulk update for main grid
+      liftingAmendmentData.forEach(row => {
+        if (row.date >= from && row.date <= to) {
+          const suffix = location ? `${product}_${location}` : product;
+          row[`adjustment_${suffix}${type}`] = value;
+          if (type === "CL" && Array.isArray(row.nomination)) {
+            const perNom = row.nomination.length ? value / row.nomination.length : 0;
+            row.nomination.forEach(n => {
+              n[`adjustedQty_${product}`] = perNom;
+            });
+          }
+        }
+      });
+      recalculateLiftingData();
+      $("#liftingAmendmentGrid").dxDataGrid("instance").refresh();
+      renderAllKpiCards();
+      toastr.success("Bulk adjustment applied!");
+    }
+
+    $('#bulkAdjustModal').modal('hide');
+  });
+
+  // Add event handler for working capacity bulk icon button
+  $(document).on('click', '.working-capacity-bulk-btn', function () {
+    // Hide the Working Capacity modal first
+    $('#workingCapacityModal').modal('hide');
+
+    // Set up the bulk modal as before
+    $('#bulkAdjustType').val('WC');
+    $('#bulkAdjustProduct').val($(this).data('product'));
+    $('#bulkAdjustLocation').val('');
+    $('#bulkAdjustValue').val('');
+
+    // Initialize date pickers when modal is shown
+    $('#bulkAdjustModal').on('shown.bs.modal', function () {
+      initializeBulkDatePickers();
+    });
+
+    // Show the bulk modal
+    $('#bulkAdjustModal').modal('show');
+
+    $('#bulkAdjustModal').on('hidden.bs.modal', function () {
+      // Only re-show if the Working Capacity modal was open before
+      if (!$('.modal.show').length) {
+        $('#workingCapacityModal').modal('show');
+      }
+    });
+  });
+
+  // Add event handler for page-btn (bulk adjust buttons in grid headers)
+  $(document).on('click', '.page-btn', function () {
+    $('#bulkAdjustType').val($(this).data('type'));
+    $('#bulkAdjustProduct').val($(this).data('product'));
+    $('#bulkAdjustLocation').val($(this).data('location'));
+    $('#bulkAdjustValue').val('');
+
+    // Initialize date pickers when modal is shown
+    $('#bulkAdjustModal').on('shown.bs.modal', function () {
+      initializeBulkDatePickers();
+    });
+
+    $('#bulkAdjustModal').modal('show');
+  });
+
+  // Function to initialize bulk date pickers
+  function initializeBulkDatePickers() {
+    const [monthStr, yearStr] = selection.month.split(" ");
+    const monthIndex = monthMap[monthStr];
+    const planningYear = parseInt(yearStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Calculate the minimum date (today or first day of planning month if future)
+    const planningDate = new Date(planningYear, monthIndex, 1);
+    const minDate = planningDate > today ? planningDate : today;
+
+    // Calculate the maximum date (last day of planning month)
+    const maxDate = new Date(planningYear, monthIndex + 1, 0);
+
+    // Initialize From Date Picker
+    if ($('#bulkFromDatePicker').dxDateBox('instance')) {
+      $('#bulkFromDatePicker').dxDateBox('instance').dispose();
+    }
+
+    $('#bulkFromDatePicker').dxDateBox({
+      type: "date",
+      displayFormat: "MM/dd/yyyy",
+      value: minDate,
+      min: minDate,
+      max: maxDate,
+      width: "100%",
+      onValueChanged: function (e) {
+        // Update To Date picker min value when From Date changes
+        const toDatePicker = $('#bulkToDatePicker').dxDateBox('instance');
+        if (toDatePicker && e.value) {
+          toDatePicker.option('min', e.value);
+          // If To Date is before From Date, update it
+          if (toDatePicker.option('value') < e.value) {
+            toDatePicker.option('value', e.value);
+          }
+        }
+      }
+    });
+
+    // Initialize To Date Picker
+    if ($('#bulkToDatePicker').dxDateBox('instance')) {
+      $('#bulkToDatePicker').dxDateBox('instance').dispose();
+    }
+
+    $('#bulkToDatePicker').dxDateBox({
+      type: "date",
+      displayFormat: "MM/dd/yyyy",
+      value: minDate,
+      min: minDate,
+      max: maxDate,
+      width: "100%",
+      onValueChanged: function (e) {
+        // Update From Date picker max value when To Date changes
+        const fromDatePicker = $('#bulkFromDatePicker').dxDateBox('instance');
+        if (fromDatePicker && e.value) {
+          fromDatePicker.option('max', e.value);
+          // If From Date is after To Date, update it
+          if (fromDatePicker.option('value') > e.value) {
+            fromDatePicker.option('value', e.value);
+          }
+        }
+      }
+    });
+  }
 });
+
+// Add a helper function at the top (after imports)
+function formatDateMMDDYYYY(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d)) return date;
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+}
