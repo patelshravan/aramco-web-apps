@@ -22,73 +22,69 @@ $(document).ready(function () {
     return;
   }
 
-  // Populate Terminal dropdown using LOCATION_NAME
-  const uniqueLocations = [...new Set(mappingData.map((m) => m.LOCATION_NAME))];
-  const terminalSelect = $("#terminal");
-  terminalSelect.empty();
-  terminalSelect.append(
-    `<option selected disabled value="">Select Terminal</option>`
-  );
-  uniqueLocations.forEach((location) => {
-    const displayLabel = location.trim().toLowerCase() === "international"
-      ? "Out Of Kingdom"
-      : location;
-    terminalSelect.append(`<option value="${location}">${displayLabel}</option>`);
+  // --- NEW FLOW: Product Group first ---
+
+  // 1. Populate Product Group dropdown with all unique product groups
+  const productGroupSelect = $("#productGroup");
+  const uniqueGroups = [...new Set(mappingData.map((m) => m.PRODUCT_GROUP_NAME))];
+  productGroupSelect.empty();
+  productGroupSelect.append(`<option selected disabled value="">Select Product Group</option>`);
+  uniqueGroups.forEach((group) => {
+    productGroupSelect.append(`<option value="${group}">${group}</option>`);
   });
 
-  // On Terminal change
-  terminalSelect.change(function () {
-    const selectedLocation = $(this).val();
+  // 2. Terminal/Location dropdown is empty and disabled until Product Group is selected
+  const terminalSelect = $("#terminal");
+  terminalSelect.empty();
+  terminalSelect.append(`<option selected disabled value="">Select Terminal</option>`);
+  terminalSelect.prop("disabled", true);
 
-    // 1. CLEAR PRODUCT GROUP DROPDOWN & CHECKBOXES
-    $("#productGroup")
-      .empty()
-      .append(
-        `<option selected disabled value="">Select Product Group</option>`
-      );
+  // 3. On Product Group change, populate Terminal/Location dropdown with only those locations that have the selected product group
+  productGroupSelect.off("change").on("change", function () {
+    const selectedGroup = $(this).val();
     $(".products-container").empty(); // Clear previous product checkboxes
 
-    const locationData = mappingData.filter(
-      (m) => m.LOCATION_NAME === selectedLocation
-    );
+    // Filter mappingData for selected product group
+    const groupData = mappingData.filter((m) => m.PRODUCT_GROUP_NAME === selectedGroup);
+    const uniqueLocations = [...new Set(groupData.map((m) => m.LOCATION_NAME))];
 
-    // 2. POPULATE PRODUCT GROUPS
-    populateProductGroups(locationData);
-
+    terminalSelect.empty();
+    terminalSelect.append(`<option selected disabled value="">Select Terminal</option>`);
+    uniqueLocations.forEach((location) => {
+      const displayLabel = location.trim().toLowerCase() === "international"
+        ? "Out Of Kingdom"
+        : location;
+      terminalSelect.append(`<option value="${location}">${displayLabel}</option>`);
+    });
+    terminalSelect.prop("disabled", false);
+    terminalSelect.val("");
     validateForm();
   });
 
-  function populateProductGroups(locationData) {
-    const productGroupSelect = $("#productGroup");
-    const uniqueGroups = [
-      ...new Set(locationData.map((m) => m.PRODUCT_GROUP_NAME)),
-    ];
+  // 4. On Terminal/Location change, populate products for that group/location
+  terminalSelect.off("change").on("change", function () {
+    const selectedGroup = productGroupSelect.val();
+    const selectedLocation = $(this).val();
+    $(".products-container").empty();
 
-    // Append unique product groups
-    uniqueGroups.forEach((group) => {
-      productGroupSelect.append(`<option value="${group}">${group}</option>`);
-    });
+    const locationData = mappingData.filter(
+      (m) => m.PRODUCT_GROUP_NAME === selectedGroup && m.LOCATION_NAME === selectedLocation
+    );
+    const groupProducts = locationData.map((m) => m.PRODUCT_CODE_NAME);
+    populateProductCheckboxes([...new Set(groupProducts)]);
+    validateForm();
+  });
 
-    // Define the change event (to populate products)
-    productGroupSelect.off("change").on("change", function () {
-      const selectedGroup = $(this).val();
+  // 5. Datepicker and default month
+  $("#monthPicker").datepicker({
+    format: "M yyyy",
+    startView: "months",
+    minViewMode: "months",
+    autoclose: true,
+  });
+  $("#monthPicker").val(moment().format("MMM YYYY")).change(validateForm);
 
-      // Clear previous product checkboxes whenever user changes product group
-      $(".products-container").empty();
-
-      const groupProducts = locationData
-        .filter((m) => m.PRODUCT_GROUP_NAME === selectedGroup)
-        .map((m) => m.PRODUCT_CODE_NAME);
-
-      populateProductCheckboxes([...new Set(groupProducts)]);
-      validateForm();
-    });
-
-    // Auto-select if there's exactly one product group
-    if (uniqueGroups.length === 1) {
-      productGroupSelect.val(uniqueGroups[0]).trigger("change");
-    }
-  }
+  // --- END NEW FLOW ---
 
   function populateProductCheckboxes(products) {
     const productContainer = $(".products-container");
@@ -116,26 +112,17 @@ $(document).ready(function () {
     });
   }
 
-  // Initialize datepicker
-  $("#monthPicker").datepicker({
-    format: "M yyyy",
-    startView: "months",
-    minViewMode: "months",
-    autoclose: true,
-  });
-  $("#monthPicker").val(moment().format("MMM YYYY")).change(validateForm);
-
   function validateForm() {
-    let selectedTerminal = $("#terminal").val();
     let selectedProductGroup = $("#productGroup").val();
+    let selectedTerminal = $("#terminal").val();
     let selectedMonth = $("#monthPicker").val();
     let selectedProducts = $(
       ".products-container .form-check-input:checked"
     ).length;
 
     let errors = [];
-    if (!selectedTerminal) errors.push("Please select a Terminal.");
     if (!selectedProductGroup) errors.push("Please select a Product Group.");
+    if (!selectedTerminal) errors.push("Please select a Terminal.");
     if (selectedProducts === 0)
       errors.push("Please select at least one Product.");
     if (!selectedMonth) errors.push("Please select a Month.");

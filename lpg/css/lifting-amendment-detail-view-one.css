@@ -737,3 +737,23 @@ body.modal-open {
   pointer-events: none;
   font-style: italic;
 }
+
+.dx-header-row > td {
+  font-size: 18px !important;
+  font-weight: 600;
+}
+
+.dx-datagrid .dx-header-row .dx-datagrid-text-content {
+  white-space: normal !important;
+}
+
+.dx-full-product-separator,
+.dx-datagrid-headers .dx-row > th.dx-full-product-separator,
+.dx-datagrid-headers .dx-row > td.dx-full-product-separator,
+.dx-header-row th.dx-full-product-separator,
+.dx-header-row td.dx-full-product-separator {
+  font-weight: 700 !important;
+  background-color: #e8ecef !important;
+  color: #333 !important;
+  box-shadow: inset -2px 0 0 #a9a8a8 !important;
+}
