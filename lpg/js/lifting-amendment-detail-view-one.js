@@ -2549,12 +2549,37 @@ $(document).ready(function () {
 
       // Reset adjustment and KPI
       liftingAmendmentData.forEach((row) => {
-        selection.products.forEach((product) => {
-          row[`adjustment_${product}TA`] = 0;
-          row[`adjustment_${product}CL`] = Array.isArray(row.nomination)
-            ? row.nomination.reduce((sum, n) => sum + (Number(n[`adjustedQty_${product}`]) || 0), 0)
-            : 0;
-        });
+        const isInternational = (window.versionsData?.[0]?.INTERNATIONAL === 1) &&
+          (selection.terminal?.toLowerCase() === "international");
+
+        if (isInternational) {
+          // For international terminals, we need to reset all product_location combinations
+          // Get all unique product-location combinations from the row data
+          const productLocationKeys = Object.keys(row).filter(key =>
+            key.startsWith('adjustment_') && (key.endsWith('TA') || key.endsWith('CL'))
+          );
+
+          productLocationKeys.forEach(key => {
+            if (key.endsWith('TA')) {
+              row[key] = 0;
+            } else if (key.endsWith('CL')) {
+              // For CL adjustments, we need to check if there are nominations and calculate
+              const suffix = key.replace('adjustment_', '').replace('CL', '');
+              const product = suffix.split('_')[0]; // Extract product from PRODUCT_LOCATION
+              row[key] = Array.isArray(row.nomination)
+                ? row.nomination.reduce((sum, n) => sum + (Number(n[`adjustedQty_${product}`]) || 0), 0)
+                : 0;
+            }
+          });
+        } else {
+          // For domestic terminals
+          selection.products.forEach((product) => {
+            row[`adjustment_${product}TA`] = 0;
+            row[`adjustment_${product}CL`] = Array.isArray(row.nomination)
+              ? row.nomination.reduce((sum, n) => sum + (Number(n[`adjustedQty_${product}`]) || 0), 0)
+              : 0;
+          });
+        }
       });
 
       recalculateLiftingData();
@@ -2953,9 +2978,10 @@ $(document).ready(function () {
               },
               cellTemplate(container, options) {
                 const val = Number(options.value || 0);
+                const roundedVal = Math.round(val);
                 $(container)
                   .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
-                  .text(val);
+                  .text(roundedVal);
               },
             };
             // Always add bulk edit icon for Working Capacity (domestic or international), never for Opening Inventory
@@ -3064,9 +3090,10 @@ $(document).ready(function () {
             },
             cellTemplate(container, options) {
               const val = Number(options.value || 0);
+              const roundedVal = Math.round(val);
               $(container)
                 .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
-                .text(val);
+                .text(roundedVal);
             },
           }));
 
@@ -3139,9 +3166,11 @@ $(document).ready(function () {
                 },
               },
               cellTemplate(container, options) {
+                const val = Number(options.value || 0);
+                const roundedVal = Math.round(val);
                 $(container)
                   .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
-                  .text(Number(options.value || 0));
+                  .text(roundedVal);
               },
             })),
           })
@@ -3166,9 +3195,10 @@ $(document).ready(function () {
             cellTemplate(container, options) {
               const factor = unitConversionFactors?.[product] ?? 1;
               const convertedValue = Number(options.value || 0) * factor;
+              const roundedValue = Math.round(convertedValue);
               $(container)
                 .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
-                .text(convertedValue.toLocaleString());
+                .text(roundedValue.toLocaleString());
             }
           };
           // Only add the icon button for Working Capacity grid
@@ -3553,6 +3583,10 @@ $(document).ready(function () {
     const nameMap = window.productNameMap || {};
     const container = $("#kpiScrollContainer").empty();
 
+    // Ensure 'today' is declared and initialized only once
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const isInternational =
       (window.versionsData?.[0]?.INTERNATIONAL === 1) &&
       (selection.terminal?.toLowerCase() === "international");
@@ -3610,7 +3644,8 @@ $(document).ready(function () {
           prods.map((prod, index) => {
             const key = `${loc}_${prod}`;
             const val = valuesMap[key] || 0;
-            const formattedVal = Number(val).toLocaleString("en-IN");
+            // ROUND the value before formatting
+            const formattedVal = Math.round(Number(val)).toLocaleString("en-IN");
             const isLast = index === prods.length - 1;
             return `<td class="${isLast ? 'with-right-border' : ''}" style="color: ${val > 0 ? 'blue' : '#333'}">
               <strong>${formattedVal}</strong>
@@ -3753,11 +3788,20 @@ $(document).ready(function () {
     const adjustedAvailsMap = {};
     productPairs.forEach(({ product, location }) => {
       const suffix = location ? `${product}_${location}` : product;
-      // Count the number of days where adjustment is non-zero
-      const adjustedDaysCount = liftingAmendmentData.reduce(
-        (count, r) => (Number(r[`adjustment_${suffix}TA`]) !== 0 ? count + 1 : count),
-        0
-      );
+      const adjustedDaysCount = liftingAmendmentData.reduce((count, r) => {
+        const rowDate = new Date(parseInt(yearStr), monthMap[monthStr], r.date);
+        rowDate.setHours(0, 0, 0, 0);
+        const value = r[`adjustment_${suffix}TA`];
+        if (
+          rowDate >= today &&
+          typeof value === 'number' &&
+          !isNaN(value) &&
+          value !== 0
+        ) {
+          return count + 1;
+        }
+        return count;
+      }, 0);
       adjustedAvailsMap[`${location}_${product}`] = adjustedDaysCount;
     });
 
@@ -3776,13 +3820,9 @@ $(document).ready(function () {
       </div>
     `);
     }
-    
     // Adjusted Nominations (kept as global summary)
     let dateChangedCount = 0;
     let qtyChangedCount = 0;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
     liftingAmendmentData.forEach((row) => {
       if (!Array.isArray(row.nomination)) return;
@@ -3868,8 +3908,8 @@ $(document).ready(function () {
               <td>${nom.nominationNumber}</td>
               <td>${nom.customerName || "-"}</td>
               <td>${nom.shipName || "-"}</td>
-              <td>${formatDateMMDDYYYY(originalDate)}</td>
-              <td>${formatDateMMDDYYYY(currentDate)}</td>
+              <td>${originalDate}</td>
+              <td>${currentDate}</td>
               <td><strong>${action}</strong></td>
               <td><button class="btn btn-sm btn-warning reset-nomination-btn">Reset</button></td>
             </tr>
@@ -4016,6 +4056,64 @@ $(document).ready(function () {
             });
           }
         }
+        if (
+          e.rowType === "data" &&
+          e.column.dataField &&
+          /^terminalAvails_/.test(e.column.dataField)
+        ) {
+          // build the full date for this row
+          const monthIndex = monthMap[monthStr];
+          const rowDate = new Date(
+            parseInt(yearStr),
+            monthIndex,
+            e.data.date
+          );
+          rowDate.setHours(0, 0, 0, 0);
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          // Only for present/future dates
+          if (rowDate >= today) {
+            // Find the adjustment value for this TA column
+            // e.column.dataField is like 'terminalAvails_PRODUCT' or 'terminalAvails_PRODUCT_LOCATION'
+            const suffix = e.column.dataField.replace('terminalAvails_', '');
+            const adjKey = `adjustment_${suffix}TA`;
+            const adjValue = Number(e.data[adjKey] || 0);
+            if (adjValue !== 0) {
+              $(e.cellElement).addClass('highlight-ta-adj');
+            }
+          }
+        }
+        if (
+          e.rowType === "data" &&
+          e.column.dataField &&
+          /^customerLifting_/.test(e.column.dataField)
+        ) {
+          // build the full date for this row
+          const monthIndex = monthMap[monthStr];
+          const rowDate = new Date(
+            parseInt(yearStr),
+            monthIndex,
+            e.data.date
+          );
+          rowDate.setHours(0, 0, 0, 0);
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          // Only for present/future dates
+          if (rowDate >= today) {
+            // Find the adjustment value for this CL column
+            // e.column.dataField is like 'customerLifting_PRODUCT' or 'customerLifting_PRODUCT_LOCATION'
+            const suffix = e.column.dataField.replace('customerLifting_', '');
+            const adjKey = `adjustment_${suffix}CL`;
+            const adjValue = Number(e.data[adjKey] || 0);
+            if (adjValue !== 0) {
+              $(e.cellElement).addClass('highlight-cl-adj');
+            }
+          }
+        }
       },
       onEditorPreparing(e) {
         if (
@@ -4114,7 +4212,7 @@ $(document).ready(function () {
 
               $(container)
                 .css({ fontWeight: "bold" })
-                .text(converted.toLocaleString());
+                .text(Math.round(converted).toLocaleString());
             }
           }));
 
@@ -4135,10 +4233,7 @@ $(document).ready(function () {
               const factor = unitConversionFactors?.[product] ?? 1;
               const converted = val * factor;
 
-              $(container).text(converted.toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
-              }));
+              $(container).text(Math.round(converted).toLocaleString());
             }
           }))
             .concat([
@@ -4158,10 +4253,7 @@ $(document).ready(function () {
                     return sum + raw * factor;
                   }, 0);
 
-                  $(container).text(converted.toLocaleString(undefined, {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2
-                  }));
+                  $(container).text(Math.round(converted).toLocaleString());
                 }
               },
             ]);
@@ -4184,17 +4276,12 @@ $(document).ready(function () {
               },
             },
             cellTemplate: function (container, options) {
-              const val = Number(options.value || 0);
-              const product = options.column.dataField.split("_")[1];
+              // ROUND the value before formatting
               const factor = unitConversionFactors?.[product] ?? 1;
-              const converted = val * factor;
-
+              const convertedValue = Math.round(Number(options.value || 0) * factor);
               $(container)
-                .addClass("yellow-bg")
-                .text(converted.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 2
-                }));
+                .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
+                .text(convertedValue.toLocaleString());
             }
           }));
 
@@ -4303,7 +4390,19 @@ $(document).ready(function () {
                       // If invalid, use today's date
                       return new Date();
                     })(),
-                    min: new Date(parseInt(yearStr), monthMap[monthStr], 1),
+                    min: (() => {
+                      const planningMonth = new Date(parseInt(yearStr), monthMap[monthStr], 1);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      if (
+                        today.getFullYear() === planningMonth.getFullYear() &&
+                        today.getMonth() === planningMonth.getMonth()
+                      ) {
+                        return today;
+                      } else {
+                        return planningMonth;
+                      }
+                    })(),
                     max: new Date(parseInt(yearStr), monthMap[monthStr] + 1, 0),
                     onOpened: function (e) {
                       const calendar = e.component._strategy?._widget;
@@ -4501,13 +4600,11 @@ $(document).ready(function () {
               allowEditing: false,
               allowSorting: false,
               cellTemplate: (container, options) => {
-                const raw = Number(options.value || 0);
-                const factor = getAverageConversionFactor(); // helper below
-                const converted = raw * factor;
-                $(container).text(converted.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 2
-                }));
+                const value = Number(options.value || 0);
+                const factor = getAverageConversionFactor(); // see function below
+                const converted = value * factor;
+                // ROUND the value before formatting
+                $(container).text(Math.round(converted).toLocaleString());
               }
             },
             {
@@ -4518,13 +4615,11 @@ $(document).ready(function () {
               allowEditing: false,
               allowSorting: false,
               cellTemplate: (container, options) => {
-                const raw = Number(options.value || 0);
-                const factor = getAverageConversionFactor(); // helper below
-                const converted = raw * factor;
-                $(container).text(converted.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 2
-                }));
+                const value = Number(options.value || 0);
+                const factor = getAverageConversionFactor();
+                const converted = value * factor;
+                // ROUND the value before formatting
+                $(container).text(Math.round(converted).toLocaleString());
               }
             }
           ]
@@ -4642,11 +4737,15 @@ $(document).ready(function () {
     window.generatePDF = generatePDF;
 
     function terminalAvailsTemplate(container, options) {
-      const val = Number(options.value || 0);
+      // Show base + adjustment for UI only
       const prod = options.column.dataField.split("_")[1];
+      const row = options.data;
+      const suffix = options.column.dataField.replace("terminalAvails_", "");
+      const base = Number(row[`terminalAvails_${suffix}`] || 0);
+      const adj = Number(row[`adjustment_${suffix}TA`] || 0);
       const factor = unitConversionFactors[prod] || 1;
-      const converted = val * factor;
-      $(container).text(converted.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }));
+      const display = (base + adj) * factor;
+      $(container).text(display.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }));
     }
 
     function adjustmentTemplate(container, options) {
@@ -4662,11 +4761,15 @@ $(document).ready(function () {
     }
 
     function customerLiftingTemplate(container, options) {
-      const val = Number(options.value || 0);
+      // Show base + adjustment for UI only
       const prod = options.column.dataField.split("_")[1];
+      const row = options.data;
+      const suffix = options.column.dataField.replace("customerLifting_", "");
+      const base = Number(row[`customerLifting_${suffix}`] || 0);
+      const adj = Number(row[`adjustment_${suffix}CL`] || 0);
       const factor = unitConversionFactors[prod] || 1;
-      const converted = val * factor;
-      $(container).text(converted.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }));
+      const display = (base + adj) * factor;
+      $(container).text(display.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }));
     }
 
     function closingInventoryTemplate(container, options) {
@@ -4959,3 +5062,19 @@ function formatDateMMDDYYYY(date) {
   const yyyy = d.getFullYear();
   return `${mm}/${dd}/${yyyy}`;
 }
+
+// Add CSS for highlight-ta-adj and highlight-cl-adj
+const style = document.createElement('style');
+style.innerHTML = `
+  .highlight-ta-adj {
+    border: 2px solid #ff9800 !important;
+    box-shadow: 0 0 4px #ff9800;
+    background-color: #fffbe6 !important;
+  }
+  .highlight-cl-adj {
+    border: 2px solid #2196f3 !important;
+    box-shadow: 0 0 4px #2196f3;
+    background-color: #e3f2fd !important;
+  }
+`;
+document.head.appendChild(style);
