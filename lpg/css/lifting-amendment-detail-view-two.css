@@ -753,7 +753,10 @@ body.modal-open {
 .dx-header-row th.dx-full-product-separator,
 .dx-header-row td.dx-full-product-separator {
   font-weight: 700 !important;
-  background-color: #e8ecef !important;
   color: #333 !important;
   box-shadow: inset -2px 0 0 #a9a8a8 !important;
+}
+
+.fa-edit:before {
+  margin-left: 6px;
 }

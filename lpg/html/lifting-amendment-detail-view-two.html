@@ -176,11 +176,6 @@
                     >Select Customer Amendment Requests</a
                   >
                 </li>
-                <li>
-                  <a class="dropdown-item" href="#" id="deleteVersionsBtn"
-                    >Delete Versions</a
-                  >
-                </li>
               </ul>
             </li>
           </ul>
@@ -614,21 +609,20 @@
             <div class="form-group mb-2">
               <label for="bulkFromDate">From Date:</label>
               <input
-                type="number"
+                type="text"
                 id="bulkFromDate"
-                min="1"
-                max="31"
-                class="form-control form-control-sm"
+                class="form-control form-control-sm datepicker"
+                readonly
               />
             </div>
+
             <div class="form-group mb-2">
               <label for="bulkToDate">To Date:</label>
               <input
-                type="number"
+                type="text"
                 id="bulkToDate"
-                min="1"
-                max="31"
-                class="form-control form-control-sm"
+                class="form-control form-control-sm datepicker"
+                readonly
               />
             </div>
             <div class="form-group mb-2">
@@ -1012,62 +1006,6 @@
             placeholder="Type your message..."
           ></textarea>
           <button id="send-btn" title="Send"><b>&#10148;</b></button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Delete Versions Modal -->
-    <div
-      class="modal fade"
-      id="deleteVersionsModal"
-      tabindex="-1"
-      role="dialog"
-      aria-labelledby="deleteVersionsModalLabel"
-      aria-hidden="true"
-    >
-      <div class="modal-dialog" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="deleteVersionsModalLabel">
-              Delete Versions
-            </h5>
-            <button
-              type="button"
-              class="close"
-              data-dismiss="modal"
-              aria-label="Close"
-            >
-              <span>&times;</span>
-            </button>
-          </div>
-          <div class="modal-body">
-            <div
-              id="deleteVersionsWarning"
-              class="alert alert-warning"
-              style="display: none"
-            ></div>
-            <form id="deleteVersionsForm">
-              <div id="deleteVersionsList" class="list-group">
-                <!-- Versions will be populated here -->
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              data-dismiss="modal"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="btn btn-danger"
-              id="confirmDeleteVersionsBtn"
-            >
-              Delete Selected
-            </button>
-          </div>
         </div>
       </div>
     </div>

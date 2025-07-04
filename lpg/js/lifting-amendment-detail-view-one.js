@@ -2920,6 +2920,77 @@ $(document).ready(function () {
         (window.versionsData?.[0]?.INTERNATIONAL === 1) &&
         (selection.terminal?.toLowerCase() === "international");
 
+      // --- PATCH: Opening Inventory & Working Capacity for INTERNATIONAL ---
+      // Detect if this is Opening Inventory or Working Capacity modal
+      const isOpeningInventory = selector === "#openingInventoryGrid";
+      const isWorkingCapacity = selector === "#workingCapacityGrid";
+      if (isInternational && (isOpeningInventory || isWorkingCapacity)) {
+        // Use the correct data source
+        const dataArr = isOpeningInventory ? openingInventoryData : workingCapacityData;
+        // Get all unique locations and products from the data
+        const allKeys = dataArr.flatMap(row => Object.keys(row).filter(k => k !== "Date"));
+        const uniqueLocations = [...new Set(allKeys.map(key => key.split("_")[1]))];
+        const uniqueProducts = [...new Set(allKeys.map(key => key.split("_")[0]))];
+        // Group columns by location, then by product
+        const locationColumns = uniqueLocations.map(location => ({
+          caption: location,
+          alignment: "center",
+          columns: uniqueProducts.map(product => {
+            const col = {
+              dataField: `${product}_${location}`,
+              caption: window.productNameMap?.[product] || product,
+              alignment: "center",
+              editorType: "dxNumberBox",
+              allowEditing: editingEnabled,
+              allowSorting: false,
+              editorOptions: {
+                min: 0,
+                showSpinButtons: false,
+                format: "#,##0.##",
+                inputAttr: {
+                  style: "background-color: #f6edc8; font-weight: bold;",
+                },
+              },
+              cellTemplate(container, options) {
+                const val = Number(options.value || 0);
+                $(container)
+                  .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
+                  .text(val);
+              },
+            };
+            // Always add bulk edit icon for Working Capacity (domestic or international), never for Opening Inventory
+            if (isWorkingCapacity) {
+              col.headerCellTemplate = function (container, options) {
+                $(container).html(`
+                  <div style="display:flex; align-items:center; justify-content:center;">
+                    <span>${window.productNameMap?.[product] || product}</span>
+                    <button class="btn btn-link p-0 m-0 working-capacity-bulk-btn" 
+                      data-product="${product}" 
+                      data-location="${location}" 
+                      title="Bulk Edit Working Capacity" 
+                      style="font-size:14px;line-height:1;vertical-align:middle;display:inline-block;margin-left:4px;">
+                      <i class="fa fa-edit"></i>
+                    </button>
+                  </div>
+                `);
+              };
+            }
+            return col;
+          }),
+        }));
+        return [
+          {
+            dataField: "Date",
+            caption: "Date",
+            width: 100,
+            alignment: "center",
+            allowEditing: false,
+            allowSorting: false,
+          },
+          ...locationColumns,
+        ];
+      }
+
       if (isInventoryPlanning) {
         if (isInternational) {
           // International → group by LOCATION + PRODUCT
@@ -3025,15 +3096,13 @@ $(document).ready(function () {
             allowSorting: false,
             cellTemplate(container, options) {
               const day = Number(options.value);
-              const fullDate = new Date(
-                parseInt(yearStr),
-                monthMap[monthStr],
-                day
-              );
-              $(container).text(
-                formatDateMMDDYYYY(fullDate)
-              );
-            },
+              if (selector === "#openingInventoryGrid" || selector === "#workingCapacityGrid") {
+                $(container).text(day);
+              } else {
+                const fullDate = new Date(parseInt(yearStr), monthMap[monthStr], day);
+                $(container).text(formatDateMMDDYYYY(fullDate));
+              }
+            }
           }]
           : [];
 
@@ -3074,16 +3143,6 @@ $(document).ready(function () {
                   .css({ backgroundColor: "#f6edc8", fontWeight: "bold" })
                   .text(Number(options.value || 0));
               },
-              headerCellTemplate: function (container, options) {
-                $(container).html(`
-                  <div style="display:flex; flex-direction:column; align-items:center;">
-                    <span>${window.productNameMap[product] || product}</span>
-                    <button class="btn btn-link p-0 m-0 working-capacity-bulk-btn" data-product="${product}" title="Bulk Edit Working Capacity" style="font-size:18px;line-height:1;">
-                      <i class="fa fa-sliders-h"></i>
-                    </button>
-                  </div>
-                `);
-              }
             })),
           })
         );
@@ -3116,10 +3175,14 @@ $(document).ready(function () {
           if (selector === "#workingCapacityGrid") {
             baseColumn.headerCellTemplate = function (container, options) {
               $(container).html(`
-                <div style="display:flex; flex-direction:column; align-items:center;">
+                <div style="display:flex; align-items:center; justify-content:center;">
                   <span>${window.productNameMap[product] || product}</span>
-                  <button class="btn btn-link p-0 m-0 working-capacity-bulk-btn" data-product="${product}" title="Bulk Edit Working Capacity" style="font-size:18px;line-height:1;">
-                    <i class="fa fa-sliders-h"></i>
+                  <button class="btn btn-link p-0 m-0 working-capacity-bulk-btn" 
+                    data-product="${product}" 
+                    data-location="" 
+                    title="Bulk Edit Working Capacity" 
+                    style="font-size:14px;line-height:1;vertical-align:middle;display:inline-block;margin-left:4px;">
+                    <i class="fa fa-edit"></i>
                   </button>
                 </div>
               `);
@@ -3475,8 +3538,8 @@ $(document).ready(function () {
           <td>${nom.nominationNumber}</td>
           <td>${nom.customerName || "-"}</td>
           <td>${nom.shipName || "-"}</td>
-          <td>${formatDateMMDDYYYY(originalDate)}</td>
-          <td>${formatDateMMDDYYYY(currentDate)}</td>
+          <td>${originalDate}</td>
+          <td>${currentDate}</td>
           <td><strong>${action}</strong></td>
           <td><button class="btn btn-sm btn-warning reset-nomination-btn">Reset</button></td>
         </tr>
@@ -3689,31 +3752,31 @@ $(document).ready(function () {
     // Adjusted Avails (Terminal Avails Adjustments)
     const adjustedAvailsMap = {};
     productPairs.forEach(({ product, location }) => {
-      const adjustedAvails = liftingAmendmentData.reduce(
-        (sum, r) => {
-          const suffix = location ? `${product}_${location}` : product;
-          return sum + (Number(r[`adjustment_${suffix}TA`]) || 0);
-        },
+      const suffix = location ? `${product}_${location}` : product;
+      // Count the number of days where adjustment is non-zero
+      const adjustedDaysCount = liftingAmendmentData.reduce(
+        (count, r) => (Number(r[`adjustment_${suffix}TA`]) !== 0 ? count + 1 : count),
         0
       );
-      const factor = currentUnit !== "MB" && unitConversionFactors[product] ? unitConversionFactors[product] : 1;
-      adjustedAvailsMap[`${location}_${product}`] = currentUnit === "MB" ? adjustedAvails : adjustedAvails * factor;
+      adjustedAvailsMap[`${location}_${product}`] = adjustedDaysCount;
     });
 
     const adjustedAvailsRow = buildValueRow(adjustedAvailsMap);
 
-    container.append(`
-    <div class="${kpiCardClass}">
-      <div class="card-title">Adjusted Avails (${currentUnit})</div>
-      <div class="kpi-table-wrapper">
-        <table class="table table-sm text-center mb-0">
-          <thead><tr>${row1}</tr><tr>${row2}</tr></thead>
-          <tbody><tr>${adjustedAvailsRow}</tr></tbody>
-        </table>
+    if (!isInternational) {
+      container.append(`
+      <div class="${kpiCardClass}">
+        <div class="card-title">Adjusted Avails (Days)</div>
+        <div class="kpi-table-wrapper">
+          <table class="table table-sm text-center mb-0">
+            <thead><tr>${row1}</tr><tr>${row2}</tr></thead>
+            <tbody><tr>${adjustedAvailsRow}</tr></tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  `);
-
+    `);
+    }
+    
     // Adjusted Nominations (kept as global summary)
     let dateChangedCount = 0;
     let qtyChangedCount = 0;
@@ -4039,7 +4102,7 @@ $(document).ready(function () {
           const actualColumns = selection.products.map((product) => ({
             dataField: `actualQty_${product}`,
             caption: (window.productNameMap && window.productNameMap[product]) || product,
-            width: 80,
+            width: 120,
             alignment: "center",
             allowEditing: false,
             allowSorting: false,
@@ -4058,7 +4121,7 @@ $(document).ready(function () {
           const scheduledColumns = selection.products.map((product) => ({
             dataField: `scheduledQty_${product}`,
             caption: (window.productNameMap && window.productNameMap[product]) || product,
-            width: 80,
+            width: 120, // Increased width for full product name
             alignment: "center",
             allowEditing: false,
             allowSorting: false,
@@ -4106,7 +4169,7 @@ $(document).ready(function () {
           const adjustedColumns = selection.products.map((product) => ({
             dataField: `adjustedQty_${product}`,
             caption: (window.productNameMap && window.productNameMap[product]) || product,
-            width: 80,
+            width: 120, // Increased width for full product name
             alignment: "center",
             allowSorting: false,
             format: "#0.##",
@@ -4507,11 +4570,12 @@ $(document).ready(function () {
           },
           cellTemplate: adjustmentTemplate,
           headerCellTemplate: function (container, options) {
+            // Use the product and location variables from the closure
             $(container).html(`
-              <div style="display:flex; flex-direction:column; align-items:center;">
+              <div style="display:flex; align-items:center; justify-content:center;">
                 <span>Adjust</span>
-                <button class="btn btn-link p-0 m-0 page-btn" data-type="TA" data-product="${product}" data-location="${location}" title="Bulk Edit" style="font-size:18px;line-height:1;">
-                  <i class="fa fa-sliders-h"></i>
+                <button class="btn btn-link p-0 m-0 bulk-adjust-btn" data-type="TA" data-product="${product}" data-location="${location}" title="Bulk Adjust" style="font-size:14px;line-height:1;vertical-align:middle;display:inline-block;margin-left:4px;">
+                  <i class="fa fa-edit"></i>
                 </button>
               </div>
             `);
@@ -4542,16 +4606,6 @@ $(document).ready(function () {
             },
           },
           cellTemplate: adjustmentTemplate,
-          headerCellTemplate: function (container, options) {
-            $(container).html(`
-              <div style="display:flex; flex-direction:column; align-items:center;">
-                <span>Adjust</span>
-                <button class="btn btn-link p-0 m-0 page-btn" data-type="CL" data-product="${product}" data-location="${location}" title="Bulk Edit" style="font-size:18px;line-height:1;">
-                  <i class="fa fa-sliders-h"></i>
-                </button>
-              </div>
-            `);
-          }
         },
         {
           dataField: `closingInventory_${suffix}`,
@@ -4663,23 +4717,29 @@ $(document).ready(function () {
   };
 
   // --- Keep session alive by pinging SASLogon every 3 minutes ---
-  function keepSessionAlive() {
-    fetch(`${BASE_URL}/SASLogon/`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+  async function keepSessionAlive() {
+    try {
+      const response = await fetch(`${BASE_URL}/SASVisualAnalytics/keepalive`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Custom-Referer': `${BASE_URL}/SASVisualAnalytics/?launchedFromAppSwitcher=true&useTransitionSplash=true`,
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('Keep-alive failed:', response.status);
+      } else {
+        console.log('Keep-alive successful');
       }
-    }).then(res => {
-      if (!res.ok) {
-        console.warn('Keep-alive failed:', res.status);
-      }
-    }).catch(err => {
+    } catch (err) {
       console.error('Keep-alive error:', err);
-    });
+    }
   }
-  setInterval(keepSessionAlive, 180000); // 3 minutes
+  setInterval(keepSessionAlive, 180000);
 
   // Add event handler for bulk adjust button
   $(document).on('click', '.bulk-adjust-btn', function () {
@@ -4710,7 +4770,11 @@ $(document).ready(function () {
       // Bulk update for Working Capacity modal
       workingCapacityData.forEach(row => {
         if (row.Date >= from && row.Date <= to) {
-          row[product] = value;
+          if (location && location !== "") {
+            row[`${product}_${location}`] = value;
+          } else {
+            row[product] = value;
+          }
         }
       });
       // Refresh the grid
@@ -4751,6 +4815,7 @@ $(document).ready(function () {
   });
 
   // Add event handler for working capacity bulk icon button
+  // For working capacity bulk icon
   $(document).on('click', '.working-capacity-bulk-btn', function () {
     // Hide the Working Capacity modal first
     $('#workingCapacityModal').modal('hide');
@@ -4758,18 +4823,70 @@ $(document).ready(function () {
     // Set up the bulk modal as before
     $('#bulkAdjustType').val('WC');
     $('#bulkAdjustProduct').val($(this).data('product'));
-    $('#bulkAdjustLocation').val('');
+    $('#bulkAdjustLocation').val($(this).data('location'));
     $('#bulkFromDate').val('');
     $('#bulkToDate').val('');
     $('#bulkAdjustValue').val('');
 
-    // Show the bulk modal
-    $('#bulkAdjustModal').modal('show');
+    // Remove any previous handler to avoid stacking
+    $('#bulkAdjustModal').off('hidden.bs.modal.workingCapacity');
 
-    $('#bulkAdjustModal').on('hidden.bs.modal', function () {
+    // Attach only for this context
+    $('#bulkAdjustModal').on('hidden.bs.modal.workingCapacity', function () {
       // Only re-show if the Working Capacity modal was open before
       if (!$('.modal.show').length) {
         $('#workingCapacityModal').modal('show');
+      }
+    });
+
+    // Show the bulk modal
+    $('#bulkAdjustModal').modal('show');
+  });
+
+  // For TA Adjust bulk icon
+  $(document).on('click', '.bulk-adjust-btn', function () {
+    // Remove any working capacity modal re-show handler
+    $('#bulkAdjustModal').off('hidden.bs.modal.workingCapacity');
+
+    $('#bulkAdjustType').val($(this).data('type'));
+    $('#bulkAdjustProduct').val($(this).data('product'));
+    $('#bulkAdjustLocation').val($(this).data('location'));
+    $('#bulkFromDate').val('');
+    $('#bulkToDate').val('');
+    $('#bulkAdjustValue').val('');
+    $('#bulkAdjustModal').modal('show');
+  });
+
+  $('#bulkAdjustModal').on('shown.bs.modal', function () {
+    // Use the selection object for planning month/year
+    const [monthStr, yearStr] = selection.month.split(" ");
+    const monthMap = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+    const planningDate = new Date(parseInt(yearStr), monthMap[monthStr], 1);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // Calculate the minimum selectable date: today if in planning month, else planningDate
+    let minDate = planningDate;
+    if (
+      today.getFullYear() === planningDate.getFullYear() &&
+      today.getMonth() === planningDate.getMonth()
+    ) {
+      minDate = today;
+    }
+    // Clear the input field so it's empty
+    $('#bulkFromDate').val("");
+    $('#bulkToDate').val("");
+    // Initialize datepicker with minDate as startDate
+    $('.datepicker').datepicker('destroy').datepicker({
+      format: 'dd',
+      startDate: minDate,
+      endDate: new Date(planningDate.getFullYear(), planningDate.getMonth() + 1, 0),
+      autoclose: true,
+      todayHighlight: true,
+      minViewMode: "days",
+      defaultViewDate: { year: planningDate.getFullYear(), month: planningDate.getMonth(), day: 1 },
+      // Disable all days before minDate
+      beforeShowDay: function (date) {
+        return date >= minDate;
       }
     });
   });
@@ -4818,6 +4935,9 @@ $(document).ready(function () {
       toastr.warning("Please select at least one version to delete.");
       return;
     }
+
+    // TODO: Replace with your actual API call or deletion logic
+    // Example: await deleteVersionsAPI(selectedIds);
 
     // Remove from savedVersions array (if local)
     savedVersions = savedVersions.filter(v => !selectedIds.includes(String(v.id)));
