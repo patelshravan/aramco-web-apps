@@ -6,13 +6,16 @@ const API_ENDPOINTS = {
     LANDING_PAGE: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.get_usernm',
     READ: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.read',
     SAVE: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.save',
+    INVPROJ_DELETE_VERSION: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.delete_version',
     FETCH_GOSP_AVAIL: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.fetch_gosp_avail',
     UPDATE_UOM: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.update_uom',
     UPDATE_GUAGE_FACTOR: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.update_uom',
     GOSP_DROPDOWN: `/SASJobExecution/?_program=${API_PATH}%2Finvproj_gosp_get_dropdown`,
     GOSP_READ: `/SASJobExecution/?_program=${API_PATH}%2Finvproj_gosp_read`,
     GOSP_SAVE: `/SASJobExecution/?_program=${API_PATH}%2Finvproj_gosp_save`,
+    INVPROJ_CONCURRENT_USER: '/SASJobExecution/?_program=${API_PATH}%2Finvproj.concurrent_user',
     CSRF: '/SASJobExecution/?csrf',
+    COMPARE_SIMULATED_CLOSING_URL: 'https://sas-prod.aramco.com.sa/SASVisualAnalytics/?reportUri=%2Freports%2Freports%2F3cb8f899-dde8-4493-8d0c-d0d470a7e736&sectionIndex=0&pageNavigation=false&sas-welcome=false',
 };
 
 export {

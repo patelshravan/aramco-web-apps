@@ -4886,31 +4886,45 @@ $(document).ready(function () {
     const $list = $("#deleteVersionsList").empty();
     const currentVersionNo = activeVersionFromReadAPI?.VERSION_NO;
     const warningDiv = $("#deleteVersionsWarning").hide();
+    const $deleteBtn = $("#confirmDeleteVersionsBtn");
 
     // Filter out 'default' version (assuming its name is 'default')
     const deletableVersions = savedVersions.filter(
       v => v.name.toLowerCase() !== "default"
     );
 
-    deletableVersions.forEach(version => {
-      const isCurrent = String(version.id) === String(currentVersionNo);
+    // Check if there are any deletable versions
+    if (deletableVersions.length === 0) {
       $list.append(`
-      <label class="list-group-item d-flex align-items-center">
-        <input type="checkbox" class="delete-version-checkbox" value="${version.id}" ${isCurrent ? "disabled" : ""}>
-        <span class="ml-2">${version.name} ${isCurrent ? "<span class='badge badge-info ml-1'>(Current)</span>" : ""}</span>
-      </label>
-    `);
-    });
+        <div class="text-center text-muted py-3">
+          <i class="fa fa-info-circle"></i> No versions available for deletion.
+        </div>
+      `);
+      $deleteBtn.prop("disabled", true).text("Delete Selected");
+    } else {
+      deletableVersions.forEach(version => {
+        const isCurrent = String(version.id) === String(currentVersionNo);
+        $list.append(`
+          <label class="list-group-item d-flex align-items-center">
+            <input type="checkbox" class="delete-version-checkbox" value="${version.id}" ${isCurrent ? "disabled" : ""}>
+            <span class="ml-2">${version.name} ${isCurrent ? "<span class='badge badge-info ml-1'>(Current)</span>" : ""}</span>
+          </label>
+        `);
+      });
 
-    // Warn if user tries to select current version
-    $list.off("change", ".delete-version-checkbox").on("change", ".delete-version-checkbox", function () {
-      const versionId = $(this).val();
-      if (String(versionId) === String(currentVersionNo)) {
-        warningDiv.text("You cannot delete the current version.").show();
-        $(this).prop("checked", false);
-        setTimeout(() => warningDiv.fadeOut(), 2000);
-      }
-    });
+      // Enable the delete button initially
+      $deleteBtn.prop("disabled", false).text("Delete Selected");
+
+      // Warn if user tries to select current version
+      $list.off("change", ".delete-version-checkbox").on("change", ".delete-version-checkbox", function () {
+        const versionId = $(this).val();
+        if (String(versionId) === String(currentVersionNo)) {
+          warningDiv.text("You cannot delete the current version.").show();
+          $(this).prop("checked", false);
+          setTimeout(() => warningDiv.fadeOut(), 2000);
+        }
+      });
+    }
 
     $("#deleteVersionsModal").modal("show");
   });
@@ -4926,16 +4940,55 @@ $(document).ready(function () {
       return;
     }
 
-    // TODO: Replace with your actual API call or deletion logic
-    // Example: await deleteVersionsAPI(selectedIds);
+    // Show loading spinner and disable button
+    const $btn = $(this).prop("disabled", true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...');
 
-    // Remove from savedVersions array (if local)
-    savedVersions = savedVersions.filter(v => !selectedIds.includes(String(v.id)));
+    try {
+      // Create payload similar to startUserCheckPolling but with the version numbers to delete
+      const deletePayload = {
+        MONTH_VALUE: selection?.month?.replace(" ", "").toUpperCase(),
+        PRODUCT_GROUP: selection?.productGroupCode,
+        LOCATION: selection?.locationCode,
+        PRODUCT_CODE: selection?.productCodes,
+        VERSION_NO: selectedIds.map(id => Number(id)), // Array of version numbers to delete
+        PROCESS_ID: window.processId,
+      };
 
-    toastr.success("Selected versions deleted.");
-    $("#deleteVersionsModal").modal("hide");
+      console.log("Delete Version Payload:", deletePayload);
 
-    // Optionally, refresh any UI that shows the versions list
+      const csrfToken = await fetchCSRFToken();
+      const response = await fetch(`${BASE_URL}${API_ENDPOINTS.DELETE_VERSION}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-TOKEN": csrfToken,
+          "Cache-Control": "no-cache",
+        },
+        credentials: "include",
+        body: JSON.stringify(deletePayload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Delete API failed with status: " + response.status);
+      }
+
+      const result = await response.json();
+      console.log("Delete Version Success:", result);
+
+      // Remove from savedVersions array
+      savedVersions = savedVersions.filter(v => !selectedIds.includes(String(v.id)));
+
+      toastr.success("Selected versions deleted successfully!");
+      $("#deleteVersionsModal").modal("hide");
+
+      // Optionally refresh the data to get updated version list
+      await callReadAPIWithSelection(selection);
+    } catch (error) {
+      console.error("Delete Version Failed:", error);
+      toastr.error("Failed to delete versions.");
+    } finally {
+      $btn.prop("disabled", false).text("Delete Selected");
+    }
   });
 });
 
